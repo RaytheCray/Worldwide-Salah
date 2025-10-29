@@ -1,6 +1,6 @@
 # worldwide_salah
 
-A new Flutter project.
+A comprehensive prayer time app letting Muslims worldwide pray on time
 
 ## Getting Started
 
