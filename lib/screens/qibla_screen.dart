@@ -22,6 +22,8 @@ class _QiblaScreenState extends State<QiblaScreen> {
   double? _heading;
   double? _qiblaDirection;
   String _directionText = '';
+  Stream<CompassEvent>? _compassStream;
+  bool _isInitialized = false;
 
   @override
   void initState() {
@@ -30,6 +32,16 @@ class _QiblaScreenState extends State<QiblaScreen> {
       widget.userLatitude,
       widget.userLongitude,
     );
+    
+    // Delay compass initialization to avoid vsync timing conflicts
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        setState(() {
+          _compassStream = FlutterCompass.events;
+          _isInitialized = true;
+        });
+      }
+    });
   }
 
   /// Calculate the bearing from user's location to Kaaba in Mecca
@@ -108,29 +120,8 @@ class _QiblaScreenState extends State<QiblaScreen> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: StreamBuilder<CompassEvent>(
-        stream: FlutterCompass.events,
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.error_outline,
-                      size: 64, color: Colors.red.shade300),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Error: ${snapshot.error}',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(
+      body: !_isInitialized
+          ? Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -146,266 +137,305 @@ class _QiblaScreenState extends State<QiblaScreen> {
                   ),
                 ],
               ),
-            );
-          }
+            )
+          : StreamBuilder<CompassEvent>(
+              stream: _compassStream,
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.error_outline,
+                            size: 64, color: Colors.red.shade300),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Error: ${snapshot.error}',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 16),
+                        ),
+                      ],
+                    ),
+                  );
+                }
 
-          if (!snapshot.hasData || snapshot.data!.heading == null) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.explore_off,
-                      size: 64, color: Colors.grey.shade400),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Compass not available on this device',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 18),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Qibla direction: ${_qiblaDirection!.toStringAsFixed(1)}° (${_getDirectionText(_qiblaDirection!)})',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey.shade600,
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.blue.shade600,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Initializing compass...',
+                          style: TextStyle(fontSize: 16),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                if (!snapshot.hasData || snapshot.data!.heading == null) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.explore_off,
+                            size: 64, color: Colors.grey.shade400),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Compass not available on this device',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 18),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Qibla direction: ${_qiblaDirection!.toStringAsFixed(1)}° (${_getDirectionText(_qiblaDirection!)})',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                _heading = snapshot.data!.heading!;
+                _directionText = _getDirectionText(_qiblaDirection!);
+
+                // Calculate the angle to rotate the Qibla indicator
+                double qiblaAngle = (_qiblaDirection! - _heading!) * (math.pi / 180);
+
+                return Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Colors.blue.shade50, Colors.white],
                     ),
                   ),
-                ],
-              ),
-            );
-          }
-
-          _heading = snapshot.data!.heading!;
-          _directionText = _getDirectionText(_qiblaDirection!);
-
-          // Calculate the angle to rotate the Qibla indicator
-          double qiblaAngle = (_qiblaDirection! - _heading!) * (math.pi / 180);
-
-          return Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Colors.blue.shade50, Colors.white],
-              ),
-            ),
-            child: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(32),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const SizedBox(height: 20),
-                    Text(
-                      'Qibla Direction',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey.shade800,
-                      ),
-                    ),
-                    const SizedBox(height: 40),
-                    // Compass visualization
-                    SizedBox(
-                      height: 300,
-                      width: 300,
-                      child: Stack(
-                        alignment: Alignment.center,
+                  child: Center(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(32),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          // Compass background circle
-                          Container(
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Colors.white,
-                              border: Border.all(
-                                color: Colors.blue.shade600,
-                                width: 8,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.blue.withValues(alpha: 0.3),
-                                  blurRadius: 20,
-                                  offset: const Offset(0, 10),
-                                ),
-                              ],
+                          const SizedBox(height: 20),
+                          Text(
+                            'Qibla Direction',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey.shade800,
                             ),
                           ),
-                          // Cardinal directions (rotate with heading)
-                          Transform.rotate(
-                            angle: -_heading! * (math.pi / 180),
+                          const SizedBox(height: 40),
+                          // Compass visualization
+                          SizedBox(
+                            height: 300,
+                            width: 300,
                             child: Stack(
                               alignment: Alignment.center,
                               children: [
-                                // North
-                                Positioned(
-                                  top: 16,
-                                  child: Text(
-                                    'N',
-                                    style: TextStyle(
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.red.shade700,
+                                // Compass background circle
+                                Container(
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: Colors.white,
+                                    border: Border.all(
+                                      color: Colors.blue.shade600,
+                                      width: 8,
                                     ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.blue.withValues(alpha: 0.3),
+                                        blurRadius: 20,
+                                        offset: const Offset(0, 10),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                // South
-                                Positioned(
-                                  bottom: 16,
-                                  child: Text(
-                                    'S',
-                                    style: TextStyle(
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.grey.shade400,
-                                    ),
+                                // Cardinal directions (rotate with heading)
+                                Transform.rotate(
+                                  angle: -_heading! * (math.pi / 180),
+                                  child: Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      // North
+                                      Positioned(
+                                        top: 16,
+                                        child: Text(
+                                          'N',
+                                          style: TextStyle(
+                                            fontSize: 24,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.red.shade700,
+                                          ),
+                                        ),
+                                      ),
+                                      // South
+                                      Positioned(
+                                        bottom: 16,
+                                        child: Text(
+                                          'S',
+                                          style: TextStyle(
+                                            fontSize: 24,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.grey.shade400,
+                                          ),
+                                        ),
+                                      ),
+                                      // East
+                                      Positioned(
+                                        right: 16,
+                                        child: Text(
+                                          'E',
+                                          style: TextStyle(
+                                            fontSize: 24,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.grey.shade600,
+                                          ),
+                                        ),
+                                      ),
+                                      // West
+                                      Positioned(
+                                        left: 16,
+                                        child: Text(
+                                          'W',
+                                          style: TextStyle(
+                                            fontSize: 24,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.grey.shade600,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                // East
-                                Positioned(
-                                  right: 16,
-                                  child: Text(
-                                    'E',
-                                    style: TextStyle(
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.grey.shade600,
-                                    ),
+                                // Qibla arrow pointing to Mecca
+                                Transform.rotate(
+                                  angle: qiblaAngle,
+                                  child: Icon(
+                                    Icons.navigation,
+                                    color: Colors.green.shade600,
+                                    size: 100,
                                   ),
                                 ),
-                                // West
-                                Positioned(
-                                  left: 16,
-                                  child: Text(
-                                    'W',
-                                    style: TextStyle(
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.grey.shade600,
-                                    ),
+                                // Center dot
+                                Container(
+                                  height: 10,
+                                  width: 10,
+                                  decoration: const BoxDecoration(
+                                    color: Colors.black,
+                                    shape: BoxShape.circle,
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                          // Qibla arrow pointing to Mecca
-                          Transform.rotate(
-                            angle: qiblaAngle,
-                            child: Icon(
-                              Icons.navigation,
-                              color: Colors.green.shade600,
-                              size: 100,
-                            ),
-                          ),
-                          // Center dot
-                          Container(
-                            height: 10,
-                            width: 10,
-                            decoration: const BoxDecoration(
-                              color: Colors.black,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 40),
-                    // Direction info
-                    Text(
-                      '${_qiblaDirection!.toStringAsFixed(1)}°',
-                      style: TextStyle(
-                        fontSize: 48,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue.shade700,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _directionText,
-                      style: TextStyle(
-                        fontSize: 20,
-                        color: Colors.grey.shade600,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.location_on,
-                              color: Colors.blue.shade700, size: 20),
-                          const SizedBox(width: 8),
+                          const SizedBox(height: 40),
+                          // Direction info
                           Text(
-                            widget.location,
+                            '${_qiblaDirection!.toStringAsFixed(1)}°',
                             style: TextStyle(
-                              fontSize: 16,
+                              fontSize: 48,
+                              fontWeight: FontWeight.bold,
                               color: Colors.blue.shade700,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _directionText,
+                            style: TextStyle(
+                              fontSize: 20,
+                              color: Colors.grey.shade600,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Distance to Mecca: ${distance.toStringAsFixed(0)} mi',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                    const SizedBox(height: 40),
-                    // Instructions
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      margin: const EdgeInsets.symmetric(horizontal: 20),
-                      decoration: BoxDecoration(
-                        color: Colors.green.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.green),
-                      ),
-                      child: Column(
-                        children: [
-                          const Icon(
-                            Icons.info_outline,
-                            color: Colors.green,
-                            size: 30,
-                          ),
-                          const SizedBox(height: 10),
-                          const Text(
-                            'How to use:',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
+                          const SizedBox(height: 24),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 12,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.shade50,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.location_on,
+                                    color: Colors.blue.shade700, size: 20),
+                                const SizedBox(width: 8),
+                                Text(
+                                  widget.location,
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.blue.shade700,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          const SizedBox(height: 10),
-                          const Text(
-                            '1. Hold your phone flat\n'
-                            '2. Rotate yourself until the green arrow points up\n'
-                            '3. You are now facing Qibla (Mecca)',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 14),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Distance to Mecca: ${distance.toStringAsFixed(0)} mi',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                          const SizedBox(height: 40),
+                          // Instructions
+                          Container(
+                            padding: const EdgeInsets.all(20),
+                            margin: const EdgeInsets.symmetric(horizontal: 20),
+                            decoration: BoxDecoration(
+                              color: Colors.green.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.green),
+                            ),
+                            child: const Column(
+                              children: [
+                                Icon(
+                                  Icons.info_outline,
+                                  color: Colors.green,
+                                  size: 30,
+                                ),
+                                SizedBox(height: 10),
+                                Text(
+                                  'How to use:',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                SizedBox(height: 10),
+                                Text(
+                                  '1. Hold your phone flat\n'
+                                  '2. Rotate yourself until the green arrow points up\n'
+                                  '3. You are now facing Qibla (Mecca)',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(fontSize: 14),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
                     ),
-                  ],
-                ),
-              ),
+                  ),
+                );
+              },
             ),
-          );
-        },
-      ),
     );
   }
 }
