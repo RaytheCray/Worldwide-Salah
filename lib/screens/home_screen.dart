@@ -16,8 +16,8 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedTab = 0;
   String _location = 'New York, NY';
-  final double _latitude = 40.7128;
-  final double _longitude = -74.0060;
+  double _latitude = 40.7128;
+  double _longitude = -74.0060;
   String _calculationMethod = 'ISNA';
   String _asrMethod = 'Standard';
   Timer? _timer;
@@ -27,9 +27,11 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      setState(() {
-        _currentTime = DateTime.now();
-      });
+      if (mounted) {
+        setState(() {
+          _currentTime = DateTime.now();
+        });
+      }
     });
   }
 
@@ -117,21 +119,33 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _showSettings() {
-    Navigator.push(
+  Future<void> _showSettings() async {
+    final result = await Navigator.push<Map<String, String>>(
       context,
       MaterialPageRoute(
         builder: (context) => SettingsScreen(
           location: _location,
           calculationMethod: _calculationMethod,
           asrMethod: _asrMethod,
-          onLocationChanged: (val) => setState(() => _location = val),
-          onCalculationMethodChanged: (val) =>
-              setState(() => _calculationMethod = val),
-          onAsrMethodChanged: (val) => setState(() => _asrMethod = val),
+          onLocationChanged: (val) {},  // Callbacks no longer needed
+          onCalculationMethodChanged: (val) {},
+          onAsrMethodChanged: (val) {},
         ),
       ),
     );
+
+    // Update state after navigation completes
+    if (result != null && mounted) {
+      // Add a small delay to ensure navigation animation is complete
+      await Future.delayed(const Duration(milliseconds: 100));
+      if (mounted) {
+        setState(() {
+          _location = result['location'] ?? _location;
+          _calculationMethod = result['calculationMethod'] ?? _calculationMethod;
+          _asrMethod = result['asrMethod'] ?? _asrMethod;
+        });
+      }
+    }
   }
 
   void _showQibla() {
