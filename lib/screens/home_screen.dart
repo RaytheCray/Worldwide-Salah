@@ -16,8 +16,8 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedTab = 0;
   String _location = 'New York, NY';
-  double _latitude = 40.7128;
-  double _longitude = -74.0060;
+  final double _latitude = 40.7128;
+  final double _longitude = -74.0060;
   String _calculationMethod = 'ISNA';
   String _asrMethod = 'Standard';
   Timer? _timer;
