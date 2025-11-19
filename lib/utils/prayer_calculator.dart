@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../models/prayer_time.dart';
+import '../models/prayer_times.dart';
 import '../services/api_service.dart';
 
 class PrayerCalculator {
