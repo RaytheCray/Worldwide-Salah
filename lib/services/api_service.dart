@@ -2,27 +2,28 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ApiService {
-  // IMPORTANT: Update this based on your environment
-  // For local development with emulator: http://localhost:5000/api
-  // For local development with physical device: http://YOUR_IP:5000/api
-  // For production: https://your-backend-url.com/api
+  // BACKEND URL CONFIGURATION
+  // Android Emulator: use 10.0.2.2 instead of localhost
+  // iOS Simulator: use localhost
+  // Physical Device: use your computer's IP address
   
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://localhost:5000/api',
+    defaultValue: 'http://10.0.2.2:5000/api', // Default for Android emulator
   );
   
-  // Alternative: Hardcode for testing
-  // static const String baseUrl = 'http://192.168.1.100:5000/api';
+  // For iOS simulator, use: 'http://localhost:5000/api'
+  // For physical device, use: 'http://YOUR_COMPUTER_IP:5000/api'
+  // Example: 'http://192.168.1.100:5000/api'
   
-  // Timeout duration for API calls
   static const Duration timeoutDuration = Duration(seconds: 10);
 
   /// Get prayer times for a specific date
+  /// Returns: { 'success': bool, 'date': string, 'times': {...}, 'method': string }
   Future<Map<String, dynamic>> getPrayerTimes({
     required double latitude,
     required double longitude,
-    required String date,
+    required String date, // Format: YYYY-MM-DD
     String method = 'ISNA',
     String asrMethod = 'standard',
   }) async {
@@ -42,17 +43,21 @@ class ApiService {
           .timeout(timeoutDuration);
 
       if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+        final data = jsonDecode(response.body);
+        print('✅ Prayer times fetched successfully');
+        return data;
       } else {
         throw Exception(
             'Failed to load prayer times: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
+      print('❌ Error getting prayer times: $e');
       throw Exception('Error getting prayer times: $e');
     }
   }
 
   /// Get prayer times for entire month
+  /// Returns: { 'success': bool, 'year': int, 'month': int, 'prayers': [...] }
   Future<Map<String, dynamic>> getMonthlyPrayers({
     required double latitude,
     required double longitude,
@@ -78,17 +83,21 @@ class ApiService {
           .timeout(timeoutDuration);
 
       if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+        final data = jsonDecode(response.body);
+        print('✅ Monthly prayers fetched successfully');
+        return data;
       } else {
         throw Exception(
-            'Failed to load monthly prayers: ${response.statusCode} - ${response.body}');
+            'Failed to load monthly prayers: ${response.statusCode}');
       }
     } catch (e) {
+      print('❌ Error getting monthly prayers: $e');
       throw Exception('Error getting monthly prayers: $e');
     }
   }
 
-  /// Get Ramadan schedule
+  /// Get Ramadan schedule with fasting times
+  /// Returns: { 'success': bool, 'year': int, 'start_date': string, 'fasting_schedule': [...] }
   Future<Map<String, dynamic>> getRamadanSchedule({
     required double latitude,
     required double longitude,
@@ -110,17 +119,21 @@ class ApiService {
           .timeout(timeoutDuration);
 
       if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+        final data = jsonDecode(response.body);
+        print('✅ Ramadan schedule fetched successfully');
+        return data;
       } else {
         throw Exception(
-            'Failed to load Ramadan schedule: ${response.statusCode} - ${response.body}');
+            'Failed to load Ramadan schedule: ${response.statusCode}');
       }
     } catch (e) {
+      print('❌ Error getting Ramadan schedule: $e');
       throw Exception('Error getting Ramadan schedule: $e');
     }
   }
 
-  /// Get Qibla direction
+  /// Get Qibla direction (bearing in degrees)
+  /// Returns: { 'success': bool, 'qibla_direction': double, 'latitude': double, 'longitude': double }
   Future<Map<String, dynamic>> getQiblaDirection({
     required double latitude,
     required double longitude,
@@ -138,17 +151,21 @@ class ApiService {
           .timeout(timeoutDuration);
 
       if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+        final data = jsonDecode(response.body);
+        print('✅ Qibla direction calculated: ${data['qibla_direction']}°');
+        return data;
       } else {
         throw Exception(
-            'Failed to get Qibla direction: ${response.statusCode} - ${response.body}');
+            'Failed to get Qibla direction: ${response.statusCode}');
       }
     } catch (e) {
+      print('❌ Error getting Qibla direction: $e');
       throw Exception('Error getting Qibla direction: $e');
     }
   }
 
   /// Get available calculation methods
+  /// Returns: { 'success': bool, 'methods': {...} }
   Future<Map<String, dynamic>> getCalculationMethods() async {
     try {
       final response = await http
@@ -159,17 +176,21 @@ class ApiService {
           .timeout(timeoutDuration);
 
       if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+        final data = jsonDecode(response.body);
+        print('✅ Calculation methods fetched');
+        return data;
       } else {
         throw Exception(
-            'Failed to get calculation methods: ${response.statusCode} - ${response.body}');
+            'Failed to get calculation methods: ${response.statusCode}');
       }
     } catch (e) {
+      print('❌ Error getting calculation methods: $e');
       throw Exception('Error getting calculation methods: $e');
     }
   }
 
-  /// Health check
+  /// Health check - Test if backend is running
+  /// Returns: true if server is healthy, false otherwise
   Future<bool> checkServerHealth() async {
     try {
       final response = await http
@@ -181,26 +202,57 @@ class ApiService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return data['success'] == true;
+        final isHealthy = data['success'] == true && data['status'] == 'running';
+        if (isHealthy) {
+          print('✅ Backend server is healthy');
+          print('   Database: ${data['database']}');
+        }
+        return isHealthy;
       }
       return false;
     } catch (e) {
-      // Server is not reachable
+      print('❌ Cannot connect to backend server');
+      print('   Make sure Flask is running on $baseUrl');
       return false;
     }
   }
 
-  /// Test connection to server
+  /// Test connection with detailed message
   Future<String> testConnection() async {
     try {
+      print('🔍 Testing connection to $baseUrl...');
       final isHealthy = await checkServerHealth();
       if (isHealthy) {
-        return 'Connected to server at $baseUrl';
+        return '✅ Successfully connected to backend\n🌐 Server: $baseUrl';
       } else {
-        return 'Server responded but health check failed';
+        return '⚠️ Server responded but health check failed\n🌐 Server: $baseUrl';
       }
     } catch (e) {
-      return 'Cannot connect to server: $e';
+      return '❌ Cannot connect to server\n🌐 Server: $baseUrl\n\n'
+          'Make sure:\n'
+          '1. Flask backend is running (python app.py)\n'
+          '2. Backend URL is correct\n'
+          '3. No firewall blocking connection\n\n'
+          'Error: $e';
+    }
+  }
+
+  /// Helper: Format date for API (YYYY-MM-DD)
+  static String formatDate(DateTime date) {
+    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  }
+
+  /// Helper: Parse time string from API (HH:MM) to TimeOfDay
+  static TimeOfDay parseTime(String timeString) {
+    try {
+      final parts = timeString.split(':');
+      return TimeOfDay(
+        hour: int.parse(parts[0]),
+        minute: int.parse(parts[1]),
+      );
+    } catch (e) {
+      print('❌ Error parsing time: $timeString');
+      return const TimeOfDay(hour: 0, minute: 0);
     }
   }
 }
