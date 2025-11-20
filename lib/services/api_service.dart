@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter/material.dart';
 
 class ApiService {
   // BACKEND URL CONFIGURATION
@@ -17,6 +18,13 @@ class ApiService {
   // Example: 'http://192.168.1.100:5000/api'
   
   static const Duration timeoutDuration = Duration(seconds: 10);
+
+  /// Initialize API service (for compatibility with existing code)
+  static Future<void> init() async {
+    // No initialization needed for now
+    // This method exists for compatibility with code that calls ApiService.init()
+    print('📱 ApiService initialized');
+  }
 
   /// Get prayer times for a specific date
   /// Returns: { 'success': bool, 'date': string, 'times': {...}, 'method': string }
@@ -161,6 +169,35 @@ class ApiService {
     } catch (e) {
       print('❌ Error getting Qibla direction: $e');
       throw Exception('Error getting Qibla direction: $e');
+    }
+  }
+
+  /// Get nearby mosques
+  /// Returns: { 'success': bool, 'mosques': [...], 'count': int }
+  Future<Map<String, dynamic>> getNearbyMosques({
+    required double latitude,
+    required double longitude,
+    double radius = 10.0, // in kilometers
+  }) async {
+    try {
+      final response = await http
+          .get(
+            Uri.parse('$baseUrl/mosques/nearby?lat=$latitude&lng=$longitude&radius=$radius'),
+            headers: {'Content-Type': 'application/json'},
+          )
+          .timeout(timeoutDuration);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        print('✅ Found ${data['count']} mosques nearby');
+        return data;
+      } else {
+        throw Exception(
+            'Failed to get nearby mosques: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('❌ Error getting nearby mosques: $e');
+      throw Exception('Error getting nearby mosques: $e');
     }
   }
 
