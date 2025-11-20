@@ -15,8 +15,9 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  PrayerTimes? _prayerTimes;
-  List<Mosque> _nearbyMosques = [];
+  prayer_model.PrayerTimes? _prayerTimes;
+  List<mosque_model.Mosque> _nearbyMosques = [];
+  final ApiService _api = ApiService();
   bool _isLoading = false;
   String? _errorMessage;
   Position? _currentPosition;
@@ -28,9 +29,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _initializeApp() async {
-    // Initialize API service and load saved token
-    final ApiService _api = ApiService();
-    
     // Get location and load data
     await _getCurrentLocation();
   }
@@ -114,7 +112,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final mosquesList = response['mosques'] as List;
       setState(() {
         _nearbyMosques = mosquesList
-            .map((json) => Mosque.fromJson(json))
+            .map((json) => mosque_model.Mosque.fromJson(json))
             .toList();
       });
     }
@@ -309,7 +307,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _showMosqueDetails(Mosque mosque) {
+  void _showMosqueDetails(mosque_model.Mosque mosque) {
     showModalBottomSheet(
       context: context,
       builder: (context) {

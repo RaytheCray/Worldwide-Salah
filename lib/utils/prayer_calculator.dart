@@ -10,6 +10,13 @@ import '../services/api_service.dart';
 
     String get formattedTime =>
       '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+
+      // true if this prayer's time is earlier than `now`
+    bool isPast(TimeOfDay now) {
+      final int t = time.hour * 60 + time.minute;
+      final int n = now.hour * 60 + now.minute;
+      return t < n;
+    }
   }
 
 class PrayerCalculator {
