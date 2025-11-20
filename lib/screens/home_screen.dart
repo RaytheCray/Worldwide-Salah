@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import '../services/api_service.dart';
-import '../models/prayer_times.dart';
-import '../models/mosque.dart';
+import '../models/prayer_times.dart' as prayer_model;
+import '../models/mosque.dart' as mosque_model;
+
+List<mosque_model.Mosque> _nearbyMosques = [];
+prayer_model.PrayerTimes? _prayerTimes;
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -26,7 +29,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _initializeApp() async {
     // Initialize API service and load saved token
-    await ApiService.init();
+    final ApiService _api = ApiService();
     
     // Get location and load data
     await _getCurrentLocation();
@@ -79,7 +82,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final today = DateTime.now();
     final dateString = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
 
-    final response = await ApiService.getPrayerTimes(
+    final response = await _api.getPrayerTimes(
       latitude: _currentPosition!.latitude,
       longitude: _currentPosition!.longitude,
       date: dateString,
@@ -101,7 +104,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadNearbyMosques() async {
     if (_currentPosition == null) return;
 
-    final response = await ApiService.getNearbyMosques(
+    final response = await _api.getNearbyMosques(
       latitude: _currentPosition!.latitude,
       longitude: _currentPosition!.longitude,
       radius: 10.0,

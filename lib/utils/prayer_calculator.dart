@@ -1,12 +1,22 @@
 import 'package:flutter/material.dart';
-import '../models/prayer_times.dart';
 import '../services/api_service.dart';
+
+// Single prayer entry (name + TimeOfDay)
+  class PrayerTime {
+    final String name;
+    final TimeOfDay time;
+
+    PrayerTime(this.name, this.time);
+
+    String get formattedTime =>
+      '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+  }
 
 class PrayerCalculator {
   static final ApiService _apiService = ApiService();
   
   // Cache for prayer times to avoid repeated API calls
-  static Map<String, List<PrayerTimes>>? _cachedPrayers;
+  static Map<String, List<PrayerTime>>? _cachedPrayers;
   static String? _cachedDate;
   static double? _cachedLat;
   static double? _cachedLon;
@@ -45,12 +55,12 @@ class PrayerCalculator {
         final times = response['times'] as Map<String, dynamic>;
         
         final prayers = [
-          PrayerTimes('Fajr', ApiService.parseTime(times['fajr'])),
-          PrayerTimes('Sunrise', ApiService.parseTime(times['sunrise'])),
-          PrayerTimes('Dhuhr', ApiService.parseTime(times['dhuhr'])),
-          PrayerTimes('Asr', ApiService.parseTime(times['asr'])),
-          PrayerTimes('Maghrib', ApiService.parseTime(times['maghrib'])),
-          PrayerTimes('Isha', ApiService.parseTime(times['isha'])),
+          PrayerTime('Fajr', ApiService.parseTime(times['fajr'])),
+          PrayerTime('Sunrise', ApiService.parseTime(times['sunrise'])),
+          PrayerTime('Dhuhr', ApiService.parseTime(times['dhuhr'])),
+          PrayerTime('Asr', ApiService.parseTime(times['asr'])),
+          PrayerTime('Maghrib', ApiService.parseTime(times['maghrib'])),
+          PrayerTime('Isha', ApiService.parseTime(times['isha'])),
         ];
 
         // Cache the results
@@ -173,12 +183,12 @@ class PrayerCalculator {
             'day': day['day'],
             'date': day['date'],
             'prayers': [
-              PrayerTimes('Fajr', ApiService.parseTime(times['fajr'])),
-              PrayerTimes('Sunrise', ApiService.parseTime(times['sunrise'])),
-              PrayerTimes('Dhuhr', ApiService.parseTime(times['dhuhr'])),
-              PrayerTimes('Asr', ApiService.parseTime(times['asr'])),
-              PrayerTimes('Maghrib', ApiService.parseTime(times['maghrib'])),
-              PrayerTimes('Isha', ApiService.parseTime(times['isha'])),
+              PrayerTime('Fajr', ApiService.parseTime(times['fajr'])),
+              PrayerTime('Sunrise', ApiService.parseTime(times['sunrise'])),
+              PrayerTime('Dhuhr', ApiService.parseTime(times['dhuhr'])),
+              PrayerTime('Asr', ApiService.parseTime(times['asr'])),
+              PrayerTime('Maghrib', ApiService.parseTime(times['maghrib'])),
+              PrayerTime('Isha', ApiService.parseTime(times['isha'])),
             ],
           };
         }).toList();
@@ -270,12 +280,12 @@ class PrayerCalculator {
   static List<PrayerTime> _getDefaultPrayerTimes() {
     print('⚠️ Using default prayer times (API unavailable)');
     return [
-      PrayerTimes('Fajr', const TimeOfDay(hour: 5, minute: 30)),
-      PrayerTimes('Sunrise', const TimeOfDay(hour: 6, minute: 45)),
-      PrayerTimes('Dhuhr', const TimeOfDay(hour: 12, minute: 30)),
-      PrayerTimes('Asr', const TimeOfDay(hour: 15, minute: 45)),
-      PrayerTimes('Maghrib', const TimeOfDay(hour: 18, minute: 30)),
-      PrayerTimes('Isha', const TimeOfDay(hour: 19, minute: 45)),
+      PrayerTime('Fajr', const TimeOfDay(hour: 5, minute: 30)),
+      PrayerTime('Sunrise', const TimeOfDay(hour: 6, minute: 45)),
+      PrayerTime('Dhuhr', const TimeOfDay(hour: 12, minute: 30)),
+      PrayerTime('Asr', const TimeOfDay(hour: 15, minute: 45)),
+      PrayerTime('Maghrib', const TimeOfDay(hour: 18, minute: 30)),
+      PrayerTime('Isha', const TimeOfDay(hour: 19, minute: 45)),
     ];
   }
 }

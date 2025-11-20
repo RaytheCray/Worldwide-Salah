@@ -212,7 +212,7 @@ class _MonthlyTabState extends State<MonthlyTab> {
                                     fontWeight: FontWeight.w500,
                                   ),
                                 )),
-                                ...((day['prayers'] as List<PrayerTime>)
+                                ...((day['prayers'] as List<PrayerTimes>)
                                     .map((prayer) => DataCell(
                                           Text(
                                             prayer.formattedTime,
