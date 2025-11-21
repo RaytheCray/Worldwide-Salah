@@ -282,10 +282,10 @@ class _HomeScreenState extends State<HomeScreen> {
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (mosque.address != null) Text(mosque.address!),
-                if (mosque.distance != null)
+                if (mosque.address case final address?) Text(address),
+                if (mosque.distance case final distance?)
                   Text(
-                    '${mosque.distance!.toStringAsFixed(1)} km away',
+                    '${distance.toStringAsFixed(1)} km away',
                     style: const TextStyle(
                       color: Colors.blue,
                       fontWeight: FontWeight.w500,
@@ -319,32 +319,32 @@ class _HomeScreenState extends State<HomeScreen> {
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
               const SizedBox(height: 8),
-              if (mosque.address != null) ...[
+              if (mosque.address case final address?) ...[
                 Row(
                   children: [
                     const Icon(Icons.location_on, size: 16),
                     const SizedBox(width: 8),
-                    Expanded(child: Text(mosque.address!)),
+                    Expanded(child: Text(address)),
                   ],
                 ),
                 const SizedBox(height: 8),
               ],
-              if (mosque.phone != null) ...[
+              if (mosque.phone case final phone?) ...[
                 Row(
                   children: [
                     const Icon(Icons.phone, size: 16),
                     const SizedBox(width: 8),
-                    Text(mosque.phone!),
+                    Text(phone),
                   ],
                 ),
                 const SizedBox(height: 8),
               ],
-              if (mosque.website != null) ...[
+              if (mosque.website case final website?) ...[
                 Row(
                   children: [
                     const Icon(Icons.web, size: 16),
                     const SizedBox(width: 8),
-                    Expanded(child: Text(mosque.website!)),
+                    Expanded(child: Text(website)),
                   ],
                 ),
               ],

@@ -9,14 +9,14 @@ class SettingsScreen extends StatefulWidget {
   final Function(String) onAsrMethodChanged;
 
   const SettingsScreen({
-    Key? key,
+    super.key,
     required this.location,
     required this.calculationMethod,
     required this.asrMethod,
     required this.onLocationChanged,
     required this.onCalculationMethodChanged,
     required this.onAsrMethodChanged,
-  }) : super(key: key);
+  });
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -51,6 +51,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.dispose();
   }
 
+  void _handleSave() {
+    // Unfocus any text fields to stop animations before navigating
+    FocusScope.of(context).unfocus();
+    
+    // Small delay to let animations stop
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (!mounted) return;
+      
+      // Pop first, then update parent state
+      Navigator.pop(context, {
+        'location': _locationController.text,
+        'calculationMethod': _selectedCalculationMethod,
+        'asrMethod': _selectedAsrMethod,
+      });
+    });
+  }
+
+  void _handleBack() {
+    FocusScope.of(context).unfocus();
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (!mounted) return;
+      Navigator.pop(context);
+    });
+  }
+
+  void _handleLocationTap() {
+    if (!mounted) return;
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('GPS location feature coming soon!'),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -59,33 +94,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         backgroundColor: Colors.blue.shade600,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            FocusScope.of(context).unfocus();
-            Future.delayed(const Duration(milliseconds: 100), () {
-              if (mounted) {
-                Navigator.pop(context);
-              }
-            });
-          },
+          onPressed: _handleBack,
         ),
         actions: [
           TextButton(
-            onPressed: () {
-              // Unfocus any text fields to stop animations before navigating
-              FocusScope.of(context).unfocus();
-              
-              // Small delay to let animations stop
-              Future.delayed(const Duration(milliseconds: 100), () {
-                if (mounted) {
-                  // Pop first, then update parent state
-                  Navigator.pop(context, {
-                    'location': _locationController.text,
-                    'calculationMethod': _selectedCalculationMethod,
-                    'asrMethod': _selectedAsrMethod,
-                  });
-                }
-              });
-            },
+            onPressed: _handleSave,
             child: const Text(
               'Save',
               style: TextStyle(
@@ -163,14 +176,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           title: const Text('Use Current Location'),
                           trailing:
                               const Icon(Icons.chevron_right, color: Colors.grey),
-                          onTap: () {
-                            // TODO: Implement GPS location with geolocator package
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('GPS location feature coming soon!'),
-                              ),
-                            );
-                          },
+                          onTap: _handleLocationTap,
                         ),
                       ),
                     ],

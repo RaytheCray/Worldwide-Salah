@@ -1,6 +1,7 @@
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'dart:async'; // for TimeoutException
+import 'package:flutter/foundation.dart';
 
 class LocationService {
   /// Check if location services are enabled
@@ -45,10 +46,10 @@ class LocationService {
         timeLimit: const Duration(seconds: 10),
       );
     } on TimeoutException {
-      print('Location timeout: Taking too long to get location');
+      debugPrint('Location timeout: Taking too long to get location');
       return null;
     } catch (e) {
-      print('Error getting location: $e');
+      debugPrint('Error getting location: $e');
       return null;
     }
   }
@@ -84,7 +85,7 @@ class LocationService {
       }
       return 'Unknown location';
     } catch (e) {
-      print('Error getting address: $e');
+      debugPrint('Error getting address: $e');
       return 'Unknown location';
     }
   }
@@ -110,7 +111,7 @@ class LocationService {
       }
       return null;
     } catch (e) {
-      print('Error getting coordinates from address: $e');
+      debugPrint('Error getting coordinates from address: $e');
       return null;
     }
   }
@@ -149,7 +150,7 @@ class LocationService {
         'subLocality': place.subLocality,
       };
     } catch (e) {
-      print('Error getting detailed location: $e');
+      debugPrint('Error getting detailed location: $e');
       return {
         'latitude': position.latitude,
         'longitude': position.longitude,

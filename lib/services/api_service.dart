@@ -23,7 +23,7 @@ class ApiService {
   static Future<void> init() async {
     // No initialization needed for now
     // This method exists for compatibility with code that calls ApiService.init()
-    print('📱 ApiService initialized');
+    debugPrint('📱 ApiService initialized');
   }
 
   /// Get prayer times for a specific date
@@ -52,14 +52,14 @@ class ApiService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        print('✅ Prayer times fetched successfully');
+        debugPrint('✅ Prayer times fetched successfully');
         return data;
       } else {
         throw Exception(
             'Failed to load prayer times: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
-      print('❌ Error getting prayer times: $e');
+      debugPrint('❌ Error getting prayer times: $e');
       throw Exception('Error getting prayer times: $e');
     }
   }
@@ -92,14 +92,14 @@ class ApiService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        print('✅ Monthly prayers fetched successfully');
+        debugPrint('✅ Monthly prayers fetched successfully');
         return data;
       } else {
         throw Exception(
             'Failed to load monthly prayers: ${response.statusCode}');
       }
     } catch (e) {
-      print('❌ Error getting monthly prayers: $e');
+      debugPrint('❌ Error getting monthly prayers: $e');
       throw Exception('Error getting monthly prayers: $e');
     }
   }
@@ -128,14 +128,14 @@ class ApiService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        print('✅ Ramadan schedule fetched successfully');
+        debugPrint('✅ Ramadan schedule fetched successfully');
         return data;
       } else {
         throw Exception(
             'Failed to load Ramadan schedule: ${response.statusCode}');
       }
     } catch (e) {
-      print('❌ Error getting Ramadan schedule: $e');
+      debugPrint('❌ Error getting Ramadan schedule: $e');
       throw Exception('Error getting Ramadan schedule: $e');
     }
   }
@@ -160,14 +160,14 @@ class ApiService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        print('✅ Qibla direction calculated: ${data['qibla_direction']}°');
+        debugPrint('✅ Qibla direction calculated: ${data['qibla_direction']}°');
         return data;
       } else {
         throw Exception(
             'Failed to get Qibla direction: ${response.statusCode}');
       }
     } catch (e) {
-      print('❌ Error getting Qibla direction: $e');
+      debugPrint('❌ Error getting Qibla direction: $e');
       throw Exception('Error getting Qibla direction: $e');
     }
   }
@@ -189,14 +189,14 @@ class ApiService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        print('✅ Found ${data['count']} mosques nearby');
+        debugPrint('✅ Found ${data['count']} mosques nearby');
         return data;
       } else {
         throw Exception(
             'Failed to get nearby mosques: ${response.statusCode}');
       }
     } catch (e) {
-      print('❌ Error getting nearby mosques: $e');
+      debugPrint('❌ Error getting nearby mosques: $e');
       throw Exception('Error getting nearby mosques: $e');
     }
   }
@@ -214,14 +214,14 @@ class ApiService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        print('✅ Calculation methods fetched');
+        debugPrint('✅ Calculation methods fetched');
         return data;
       } else {
         throw Exception(
             'Failed to get calculation methods: ${response.statusCode}');
       }
     } catch (e) {
-      print('❌ Error getting calculation methods: $e');
+      debugPrint('❌ Error getting calculation methods: $e');
       throw Exception('Error getting calculation methods: $e');
     }
   }
@@ -241,15 +241,15 @@ class ApiService {
         final data = jsonDecode(response.body);
         final isHealthy = data['success'] == true && data['status'] == 'running';
         if (isHealthy) {
-          print('✅ Backend server is healthy');
-          print('   Database: ${data['database']}');
+          debugPrint('✅ Backend server is healthy');
+          debugPrint('   Database: ${data['database']}');
         }
         return isHealthy;
       }
       return false;
     } catch (e) {
-      print('❌ Cannot connect to backend server');
-      print('   Make sure Flask is running on $baseUrl');
+      debugPrint('❌ Cannot connect to backend server');
+      debugPrint('   Make sure Flask is running on $baseUrl');
       return false;
     }
   }
@@ -257,7 +257,7 @@ class ApiService {
   /// Test connection with detailed message
   Future<String> testConnection() async {
     try {
-      print('🔍 Testing connection to $baseUrl...');
+      debugPrint('🔍 Testing connection to $baseUrl...');
       final isHealthy = await checkServerHealth();
       if (isHealthy) {
         return '✅ Successfully connected to backend\n🌐 Server: $baseUrl';
@@ -288,7 +288,7 @@ class ApiService {
         minute: int.parse(parts[1]),
       );
     } catch (e) {
-      print('❌ Error parsing time: $timeString');
+      debugPrint('❌ Error parsing time: $timeString');
       return const TimeOfDay(hour: 0, minute: 0);
     }
   }

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 class MosquesTab extends StatelessWidget {
   final String location;
 
-  const MosquesTab({Key? key, required this.location}) : super(key: key);
+  const MosquesTab({super.key, required this.location});
 
   @override
   Widget build(BuildContext context) {

@@ -8,11 +8,11 @@ class QiblaScreen extends StatefulWidget {
   final double userLongitude;
 
   const QiblaScreen({
-    Key? key,
+    super.key,
     required this.location,
     required this.userLatitude,
     required this.userLongitude,
-  }) : super(key: key);
+  });
 
   @override
   State<QiblaScreen> createState() => _QiblaScreenState();

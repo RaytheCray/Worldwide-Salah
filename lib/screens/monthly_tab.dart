@@ -30,7 +30,6 @@ class _MonthlyTabState extends State<MonthlyTab> {
       'January', 'February', 'March', 'April', 'May', 'June',
       'July', 'August', 'September', 'October', 'November', 'December'
     ];
-    final monthlyData = _generateMonthlyData();
 
     return Scaffold(
       appBar: AppBar(
