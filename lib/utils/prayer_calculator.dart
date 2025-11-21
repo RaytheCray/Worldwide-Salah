@@ -2,28 +2,28 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 
 // Single prayer entry (name + TimeOfDay)
-  class PrayerTime {
-    final String name;
-    final TimeOfDay time;
+class PrayerTime {
+  final String name;
+  final TimeOfDay time;
 
-    PrayerTime(this.name, this.time);
+  PrayerTime(this.name, this.time);
 
-    String get formattedTime =>
+  String get formattedTime =>
       '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
 
-      // true if this prayer's time is earlier than `now`
-    bool isPast(TimeOfDay now) {
-      final int t = time.hour * 60 + time.minute;
-      final int n = now.hour * 60 + now.minute;
-      return t < n;
-    }
+  // true if this prayer's time is earlier than `now`
+  bool isPast(TimeOfDay now) {
+    final int t = time.hour * 60 + time.minute;
+    final int n = now.hour * 60 + now.minute;
+    return t < n;
   }
+}
 
 class PrayerCalculator {
   static final ApiService _apiService = ApiService();
   
   // Cache for prayer times to avoid repeated API calls
-  static Map<String, List<PrayerTime>>? _cachedPrayers;
+  static List<PrayerTime>? _cachedPrayers;
   static String? _cachedDate;
   static double? _cachedLat;
   static double? _cachedLon;
@@ -43,12 +43,12 @@ class PrayerCalculator {
         _cachedDate == dateString &&
         _cachedLat == latitude &&
         _cachedLon == longitude) {
-      print('📦 Using cached prayer times for $dateString');
+      debugPrint('📦 Using cached prayer times for $dateString');
       return _cachedPrayers!;
     }
 
     try {
-      print('🌐 Fetching prayer times from backend for $dateString...');
+      debugPrint('🌐 Fetching prayer times from backend for $dateString...');
       
       final response = await _apiService.getPrayerTimes(
         latitude: latitude,
@@ -76,14 +76,14 @@ class PrayerCalculator {
         _cachedLat = latitude;
         _cachedLon = longitude;
 
-        print('✅ Prayer times loaded successfully (cached: ${response['cached']})');
+        debugPrint('✅ Prayer times loaded successfully (cached: ${response['cached']})');
         return prayers;
       } else {
         throw Exception('API returned success: false');
       }
     } catch (e) {
-      print('❌ Error fetching prayer times: $e');
-      print('⚠️ Falling back to default times');
+      debugPrint('❌ Error fetching prayer times: $e');
+      debugPrint('⚠️ Falling back to default times');
       
       // Fallback to hardcoded times if API fails
       return _getDefaultPrayerTimes();
@@ -170,7 +170,7 @@ class PrayerCalculator {
     String asrMethod = 'standard',
   }) async {
     try {
-      print('🌐 Fetching monthly prayers for $year-$month...');
+      debugPrint('🌐 Fetching monthly prayers for $year-$month...');
       
       final response = await _apiService.getMonthlyPrayers(
         latitude: latitude,
@@ -203,7 +203,7 @@ class PrayerCalculator {
         throw Exception('API returned success: false');
       }
     } catch (e) {
-      print('❌ Error fetching monthly prayers: $e');
+      debugPrint('❌ Error fetching monthly prayers: $e');
       throw Exception('Failed to load monthly prayer times');
     }
   }
@@ -216,7 +216,7 @@ class PrayerCalculator {
     String method = 'ISNA',
   }) async {
     try {
-      print('🌙 Fetching Ramadan schedule for $year...');
+      debugPrint('🌙 Fetching Ramadan schedule for $year...');
       
       final response = await _apiService.getRamadanSchedule(
         latitude: latitude,
@@ -226,15 +226,15 @@ class PrayerCalculator {
       );
 
       if (response['success'] == true) {
-        print('✅ Ramadan schedule loaded');
-        print('   Start: ${response['start_date']}');
-        print('   End: ${response['end_date']}');
+        debugPrint('✅ Ramadan schedule loaded');
+        debugPrint('   Start: ${response['start_date']}');
+        debugPrint('   End: ${response['end_date']}');
         return response;
       } else {
         throw Exception('API returned success: false');
       }
     } catch (e) {
-      print('❌ Error fetching Ramadan schedule: $e');
+      debugPrint('❌ Error fetching Ramadan schedule: $e');
       throw Exception('Failed to load Ramadan schedule');
     }
   }
@@ -245,7 +245,7 @@ class PrayerCalculator {
     required double longitude,
   }) async {
     try {
-      print('🧭 Calculating Qibla direction...');
+      debugPrint('🧭 Calculating Qibla direction...');
       
       final response = await _apiService.getQiblaDirection(
         latitude: latitude,
@@ -254,13 +254,13 @@ class PrayerCalculator {
 
       if (response['success'] == true) {
         final direction = response['qibla_direction'] as double;
-        print('✅ Qibla direction: ${direction.toStringAsFixed(1)}°');
+        debugPrint('✅ Qibla direction: ${direction.toStringAsFixed(1)}°');
         return direction;
       } else {
         throw Exception('API returned success: false');
       }
     } catch (e) {
-      print('❌ Error calculating Qibla direction: $e');
+      debugPrint('❌ Error calculating Qibla direction: $e');
       throw Exception('Failed to calculate Qibla direction');
     }
   }
@@ -271,7 +271,7 @@ class PrayerCalculator {
     _cachedDate = null;
     _cachedLat = null;
     _cachedLon = null;
-    print('🗑️ Prayer times cache cleared');
+    debugPrint('🗑️ Prayer times cache cleared');
   }
 
   /// Test backend connection
@@ -285,7 +285,7 @@ class PrayerCalculator {
 
   /// Get default/fallback prayer times when API is unavailable
   static List<PrayerTime> _getDefaultPrayerTimes() {
-    print('⚠️ Using default prayer times (API unavailable)');
+    debugPrint('⚠️ Using default prayer times (API unavailable)');
     return [
       PrayerTime('Fajr', const TimeOfDay(hour: 5, minute: 30)),
       PrayerTime('Sunrise', const TimeOfDay(hour: 6, minute: 45)),

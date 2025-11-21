@@ -33,7 +33,7 @@ Future<void> main() async {
 }
 
 class WorldwideSalahApp extends StatelessWidget {
-  const WorldwideSalahApp({Key? key}) : super(key: key);
+  const WorldwideSalahApp({super.key});
 
   @override
   Widget build(BuildContext context) {

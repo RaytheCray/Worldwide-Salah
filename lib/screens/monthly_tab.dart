@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import '../models/prayer_times.dart';
 import '../utils/prayer_calculator.dart';
 
 class MonthlyTab extends StatefulWidget {
-  const MonthlyTab({Key? key}) : super(key: key);
+  const MonthlyTab({super.key});
 
   @override
   State<MonthlyTab> createState() => _MonthlyTabState();
@@ -132,88 +131,107 @@ class _MonthlyTabState extends State<MonthlyTab> {
                       ),
                       SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
-                        child: DataTable(
-                          headingRowColor: WidgetStateProperty.all(
-                            Colors.grey.shade100,
-                          ),
-                          columnSpacing: 12,
-                          horizontalMargin: 12,
-                          columns: const [
-                            DataColumn(
-                              label: Text(
-                                'Date',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 13,
-                                ),
+                        child: FutureBuilder<List<Map<String, dynamic>>>(
+                          future: _generateMonthlyDataAsync(),
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState == ConnectionState.waiting) {
+                              return const Padding(
+                                padding: EdgeInsets.all(32.0),
+                                child: CircularProgressIndicator(),
+                              );
+                            }
+                            
+                            if (snapshot.hasError) {
+                              return Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: Text('Error: ${snapshot.error}'),
+                              );
+                            }
+                            
+                            final data = snapshot.data ?? [];
+                            
+                            return DataTable(
+                              headingRowColor: WidgetStateProperty.all(
+                                Colors.grey.shade100,
                               ),
-                            ),
-                            DataColumn(
-                              label: Text(
-                                'Fajr',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ),
-                            DataColumn(
-                              label: Text(
-                                'Sunrise',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ),
-                            DataColumn(
-                              label: Text(
-                                'Dhuhr',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ),
-                            DataColumn(
-                              label: Text(
-                                'Asr',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ),
-                            DataColumn(
-                              label: Text(
-                                'Maghrib',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ),
-                            DataColumn(
-                              label: Text(
-                                'Isha',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ),
-                          ],
-                          rows: monthlyData.map((day) {
-                            return DataRow(
-                              cells: [
-                                DataCell(Text(
-                                  '${day['day']}',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w500,
+                              columnSpacing: 12,
+                              horizontalMargin: 12,
+                              columns: const [
+                                DataColumn(
+                                  label: Text(
+                                    'Date',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13,
+                                    ),
                                   ),
-                                )),
-                                ...((day['prayers'] as List<PrayerTimes>)
-                                    .map((prayer) => DataCell(
+                                ),
+                                DataColumn(
+                                  label: Text(
+                                    'Fajr',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                                DataColumn(
+                                  label: Text(
+                                    'Sunrise',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                                DataColumn(
+                                  label: Text(
+                                    'Dhuhr',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                                DataColumn(
+                                  label: Text(
+                                    'Asr',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                                DataColumn(
+                                  label: Text(
+                                    'Maghrib',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                                DataColumn(
+                                  label: Text(
+                                    'Isha',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                              rows: data.map((day) {
+                                final prayers = day['prayers'] as List<PrayerTime>;
+                                return DataRow(
+                                  cells: [
+                                    DataCell(Text(
+                                      '${day['day']}',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    )),
+                                    ...prayers.map((prayer) => DataCell(
                                           Text(
                                             prayer.formattedTime,
                                             style: const TextStyle(
@@ -221,11 +239,12 @@ class _MonthlyTabState extends State<MonthlyTab> {
                                               fontSize: 12,
                                             ),
                                           ),
-                                        ))
-                                    .toList()),
-                              ],
+                                        )),
+                                  ],
+                                );
+                              }).toList(),
                             );
-                          }).toList(),
+                          },
                         ),
                       ),
                     ],
@@ -237,5 +256,23 @@ class _MonthlyTabState extends State<MonthlyTab> {
         ],
       ),
     );
+  }
+
+  Future<List<Map<String, dynamic>>> _generateMonthlyDataAsync() async {
+    const year = 2025;
+    final daysInMonth = DateTime(year, _selectedMonth + 2, 0).day;
+    final List<Map<String, dynamic>> result = [];
+    
+    for (int index = 0; index < daysInMonth; index++) {
+      final day = index + 1;
+      final date = DateTime(year, _selectedMonth + 1, day);
+      final prayers = await PrayerCalculator.calculatePrayerTimes(date);
+      result.add({
+        'day': day,
+        'prayers': prayers,
+      });
+    }
+    
+    return result;
   }
 }

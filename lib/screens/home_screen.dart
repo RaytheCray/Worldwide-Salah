@@ -4,11 +4,8 @@ import '../services/api_service.dart';
 import '../models/prayer_times.dart' as prayer_model;
 import '../models/mosque.dart' as mosque_model;
 
-List<mosque_model.Mosque> _nearbyMosques = [];
-prayer_model.PrayerTimes? _prayerTimes;
-
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({Key? key}) : super(key: key);
+  const HomeScreen({super.key});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -90,7 +87,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (response['success'] == true) {
       setState(() {
-        _prayerTimes = PrayerTimes.fromJson(response);
+        _prayerTimes = prayer_model.PrayerTimes.fromJson(response);
       });
     } else {
       setState(() {
