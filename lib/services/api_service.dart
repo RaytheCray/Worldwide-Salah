@@ -10,7 +10,7 @@ class ApiService {
   
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://10.0.2.2:5000/api', // Default for Android emulator
+    defaultValue: 'http://10.0.2.2:5000/nearby?lat=...&lng=...', // Default for Android emulator
   );
   
   // For iOS simulator, use: 'http://localhost:5000/api'
