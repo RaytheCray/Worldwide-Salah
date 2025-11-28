@@ -10,7 +10,7 @@ class ApiService {
   
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://10.0.2.2:5000/nearby?lat=...&lng=...', // Default for Android emulator
+    defaultValue: 'http://10.0.2.2:5000/api', // Default for Android emulator
   );
   
   // For iOS simulator, use: 'http://localhost:5000/api'
@@ -64,9 +64,9 @@ class ApiService {
     }
   }
 
-  /// Get prayer times for entire month
-  /// Returns: { 'success': bool, 'year': int, 'month': int, 'prayers': [...] }
-  Future<Map<String, dynamic>> getMonthlyPrayers({
+  /// Get monthly prayer timetable
+  /// Returns: { 'success': bool, 'month': int, 'year': int, 'days': [...] }
+  Future<Map<String, dynamic>> getMonthlyPrayerTimes({
     required double latitude,
     required double longitude,
     required int year,
@@ -92,7 +92,7 @@ class ApiService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        debugPrint('✅ Monthly prayers fetched successfully');
+        debugPrint('✅ Monthly prayer times fetched');
         return data;
       } else {
         throw Exception(
@@ -104,8 +104,8 @@ class ApiService {
     }
   }
 
-  /// Get Ramadan schedule with fasting times
-  /// Returns: { 'success': bool, 'year': int, 'start_date': string, 'fasting_schedule': [...] }
+  /// Get Ramadan fasting schedule for a year
+  /// Returns: { 'success': bool, 'year': int, 'start_date': string, 'end_date': string, 'fasting_schedule': [...] }
   Future<Map<String, dynamic>> getRamadanSchedule({
     required double latitude,
     required double longitude,
@@ -128,7 +128,7 @@ class ApiService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        debugPrint('✅ Ramadan schedule fetched successfully');
+        debugPrint('✅ Ramadan schedule fetched');
         return data;
       } else {
         throw Exception(
