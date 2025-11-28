@@ -18,53 +18,100 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = false;
   String? _errorMessage;
   Position? _currentPosition;
+  bool _mosquesLoading = false;
+  String? _mosqueError;
 
   @override
   void initState() {
     super.initState();
+    debugPrint('🔄 HomeScreen: initState called');
+    
+    // Add a safety timeout to prevent infinite loading
+    Future.delayed(const Duration(seconds: 15), () {
+      if (_isLoading && mounted) {
+        debugPrint('⏰ HomeScreen: Loading timeout triggered, forcing stop');
+        setState(() {
+          _isLoading = false;
+          if (_errorMessage == null) {
+            _errorMessage = 'Loading timed out. Please try again.';
+          }
+        });
+      }
+    });
+    
     _initializeApp();
   }
 
   Future<void> _initializeApp() async {
+    debugPrint('📱 HomeScreen: Initializing app...');
     // Get location and load data
     await _getCurrentLocation();
   }
 
   Future<void> _getCurrentLocation() async {
+    debugPrint('📍 HomeScreen: Getting current location...');
     setState(() {
       _isLoading = true;
       _errorMessage = null;
+      _mosqueError = null;
     });
 
     try {
       // Check location permission
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
+        debugPrint('⚠️ HomeScreen: Location permission denied, requesting...');
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
-          throw Exception('Location permission denied');
+          throw Exception('Location permission denied. Please enable location access in settings.');
         }
       }
 
-      // Get current position
+      if (permission == LocationPermission.deniedForever) {
+        throw Exception('Location permission permanently denied. Please enable in device settings.');
+      }
+
+      // Get current position with timeout
+      debugPrint('🌍 HomeScreen: Fetching GPS coordinates...');
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception('GPS timeout. Please check your location settings.');
+        },
       );
 
+      debugPrint('✅ HomeScreen: Location obtained - Lat: ${position.latitude}, Lng: ${position.longitude}');
+      
       setState(() {
         _currentPosition = position;
       });
 
-      // Load prayer times and mosques
-      await Future.wait([
-        _loadPrayerTimes(),
-        _loadNearbyMosques(),
-      ]);
+      // Load prayer times (REQUIRED - blocks loading screen)
+      debugPrint('📿 HomeScreen: Loading prayer times...');
+      await _loadPrayerTimes();
+      debugPrint('✅ HomeScreen: Prayer times loaded successfully');
+      
+      // Load mosques (OPTIONAL - runs in background, doesn't block UI)
+      debugPrint('🕌 HomeScreen: Loading nearby mosques in background...');
+      _loadNearbyMosques().catchError((e) {
+        debugPrint('⚠️ HomeScreen: Mosque loading failed (non-critical): $e');
+        if (mounted) {
+          setState(() {
+            _mosqueError = 'Could not load nearby mosques';
+          });
+        }
+      });
+      
     } catch (e) {
+      debugPrint('❌ HomeScreen: Error in getCurrentLocation: $e');
       setState(() {
         _errorMessage = e.toString();
       });
     } finally {
+      // CRITICAL: Always stop loading, even if there's an error
+      debugPrint('🏁 HomeScreen: Stopping loading screen');
       setState(() {
         _isLoading = false;
       });
@@ -72,46 +119,94 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadPrayerTimes() async {
-    if (_currentPosition == null) return;
+    if (_currentPosition == null) {
+      debugPrint('⚠️ HomeScreen: Cannot load prayer times - no position');
+      return;
+    }
 
-    final today = DateTime.now();
-    final dateString = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+    try {
+      final today = DateTime.now();
+      final dateString = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
 
-    final response = await _api.getPrayerTimes(
-      latitude: _currentPosition!.latitude,
-      longitude: _currentPosition!.longitude,
-      date: dateString,
-      method: 'ISNA', // You can make this configurable
-      asrMethod: 'standard',
-    );
+      debugPrint('🔄 HomeScreen: Requesting prayer times for $dateString');
+      final response = await _api.getPrayerTimes(
+        latitude: _currentPosition!.latitude,
+        longitude: _currentPosition!.longitude,
+        date: dateString,
+        method: 'ISNA', // You can make this configurable
+        asrMethod: 'standard',
+      );
 
-    if (response['success'] == true) {
-      setState(() {
-        _prayerTimes = prayer_model.PrayerTimes.fromJson(response);
-      });
-    } else {
-      setState(() {
-        _errorMessage = response['error'] ?? 'Failed to load prayer times';
-      });
+      if (response['success'] == true) {
+        debugPrint('✅ HomeScreen: Prayer times API returned success');
+        setState(() {
+          _prayerTimes = prayer_model.PrayerTimes.fromJson(response);
+        });
+      } else {
+        debugPrint('❌ HomeScreen: Prayer times API returned error: ${response['error']}');
+        throw Exception(response['error'] ?? 'Failed to load prayer times');
+      }
+    } catch (e) {
+      debugPrint('❌ HomeScreen: Error loading prayer times: $e');
+      // Re-throw so the error can be caught in _getCurrentLocation
+      rethrow;
     }
   }
 
   Future<void> _loadNearbyMosques() async {
-    if (_currentPosition == null) return;
+    if (_currentPosition == null) {
+      debugPrint('⚠️ HomeScreen: Cannot load mosques - no position');
+      return;
+    }
 
-    final response = await _api.getNearbyMosques(
-      latitude: _currentPosition!.latitude,
-      longitude: _currentPosition!.longitude,
-      radius: 10.0,
-    );
+    setState(() {
+      _mosquesLoading = true;
+      _mosqueError = null;
+    });
 
-    if (response['success'] == true) {
-      final mosquesList = response['mosques'] as List;
-      setState(() {
-        _nearbyMosques = mosquesList
-            .map((json) => mosque_model.Mosque.fromJson(json))
-            .toList();
-      });
+    try {
+      debugPrint('🔄 HomeScreen: Requesting nearby mosques (radius: 50km)');
+      final response = await _api.getNearbyMosques(
+        latitude: _currentPosition!.latitude,
+        longitude: _currentPosition!.longitude,
+        radius: 50.0, // ✅ INCREASED from 10km to 50km for better coverage
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception('Mosque search timed out');
+        },
+      );
+
+      if (response['success'] == true) {
+        final mosquesList = response['mosques'] as List;
+        debugPrint('✅ HomeScreen: Found ${mosquesList.length} mosques nearby');
+        
+        if (mounted) {
+          setState(() {
+            _nearbyMosques = mosquesList
+                .map((json) => mosque_model.Mosque.fromJson(json))
+                .toList();
+            _mosquesLoading = false;
+          });
+        }
+        
+        if (mosquesList.isEmpty) {
+          debugPrint('ℹ️ HomeScreen: No mosques found in 50km radius');
+        }
+      } else {
+        debugPrint('❌ HomeScreen: Mosque API returned error: ${response['error']}');
+        throw Exception(response['error'] ?? 'Failed to load mosques');
+      }
+    } catch (e) {
+      debugPrint('❌ HomeScreen: Error loading mosques: $e');
+      if (mounted) {
+        setState(() {
+          _nearbyMosques = [];
+          _mosquesLoading = false;
+          _mosqueError = 'Unable to load nearby mosques';
+        });
+      }
+      // Don't rethrow - mosque loading is optional
     }
   }
 
@@ -130,12 +225,35 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Loading...',
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'This may take a few seconds',
+                    style: TextStyle(
+                      color: Colors.grey[400],
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            )
           : _errorMessage != null
               ? _buildErrorWidget()
               : _buildContent(),
       floatingActionButton: FloatingActionButton(
-        onPressed: _getCurrentLocation,
+        onPressed: _isLoading ? null : _getCurrentLocation,
         child: const Icon(Icons.refresh),
       ),
     );
@@ -143,22 +261,26 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildErrorWidget() {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.error_outline, size: 64, color: Colors.red),
-          const SizedBox(height: 16),
-          Text(
-            _errorMessage ?? 'An error occurred',
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 16),
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: _getCurrentLocation,
-            child: const Text('Retry'),
-          ),
-        ],
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 64, color: Colors.red),
+            const SizedBox(height: 16),
+            Text(
+              _errorMessage ?? 'An error occurred',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 16),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _getCurrentLocation,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -198,15 +320,73 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 24),
             ],
 
-            // Nearby mosques
-            if (_nearbyMosques.isNotEmpty) ...[
-              Text(
-                'Nearby Mosques',
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
-              const SizedBox(height: 8),
+            // Nearby mosques section
+            Text(
+              'Nearby Mosques',
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
+            const SizedBox(height: 8),
+            
+            // Mosque loading state
+            if (_mosquesLoading)
+              const Card(
+                child: Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                      SizedBox(width: 16),
+                      Text('Loading nearby mosques...'),
+                    ],
+                  ),
+                ),
+              )
+            // Mosque error state
+            else if (_mosqueError != null)
+              Card(
+                color: Colors.orange[50],
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.warning, color: Colors.orange),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Text(
+                          _mosqueError!,
+                          style: const TextStyle(color: Colors.orange),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            // Empty mosque list
+            else if (_nearbyMosques.isEmpty)
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.grey[600]),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Text(
+                          'No mosques found within 50 km',
+                          style: TextStyle(color: Colors.grey[600]),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            // Mosque list
+            else
               _buildMosquesList(),
-            ],
           ],
         ),
       ),
