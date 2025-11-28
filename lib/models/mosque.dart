@@ -1,21 +1,21 @@
 class Mosque {
-  final int id;
+  final int mosqueId;
   final String name;
-  final String address;
-  final String city;
-  final String country;
+  final String? address;
+  final String? city;
+  final String? country;
   final double latitude;
   final double longitude;
   final String? phone;
   final String? website;
-  final double? distance; // in kilometers
+  final double? distance; // Distance in kilometers
 
   Mosque({
-    required this.id,
+    required this.mosqueId,
     required this.name,
-    required this.address,
-    required this.city,
-    required this.country,
+    this.address,
+    this.city,
+    this.country,
     required this.latitude,
     required this.longitude,
     this.phone,
@@ -24,22 +24,57 @@ class Mosque {
   });
 
   factory Mosque.fromJson(Map<String, dynamic> json) {
+    // Helper function to safely parse distance (can be String or double)
+    double? parseDistance(dynamic value) {
+      if (value == null) return null;
+      if (value is double) return value;
+      if (value is int) return value.toDouble();
+      if (value is String) {
+        try {
+          return double.parse(value);
+        } catch (e) {
+          print('⚠️ Mosque: Could not parse distance "$value": $e');
+          return null;
+        }
+      }
+      return null;
+    }
+
     return Mosque(
-      id: json['mosque_id'] ?? 0,
-      name: json['name'] ?? '',
-      address: json['address'] ?? '',
-      city: json['city'] ?? '',
-      country: json['country'] ?? '',
-      latitude: (json['latitude'] ?? 0.0).toDouble(),
-      longitude: (json['longitude'] ?? 0.0).toDouble(),
-      phone: json['phone'],
-      website: json['website'],
-      distance: json['distance'] != null ? (json['distance'] as num).toDouble() : null,
+      mosqueId: json['mosque_id'] as int,
+      name: json['name'] as String,
+      address: json['address'] as String?,
+      city: json['city'] as String?,
+      country: json['country'] as String?,
+      latitude: (json['latitude'] is String) 
+          ? double.parse(json['latitude']) 
+          : (json['latitude'] as num).toDouble(),
+      longitude: (json['longitude'] is String)
+          ? double.parse(json['longitude'])
+          : (json['longitude'] as num).toDouble(),
+      phone: json['phone'] as String?,
+      website: json['website'] as String?,
+      distance: parseDistance(json['distance']), // ✅ FIXED: Handles String or double
     );
   }
 
-  String get distanceText {
-    if (distance == null) return '';
-    return '${distance!.toStringAsFixed(1)} km away';
+  Map<String, dynamic> toJson() {
+    return {
+      'mosque_id': mosqueId,
+      'name': name,
+      'address': address,
+      'city': city,
+      'country': country,
+      'latitude': latitude,
+      'longitude': longitude,
+      'phone': phone,
+      'website': website,
+      'distance': distance,
+    };
+  }
+
+  @override
+  String toString() {
+    return 'Mosque(id: $mosqueId, name: $name, distance: ${distance?.toStringAsFixed(1)}km)';
   }
 }
