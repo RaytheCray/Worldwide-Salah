@@ -1,12 +1,12 @@
-// FIXED VERSION - lib/screens/home_screen.dart
-// Replace your existing home_screen.dart with this file
+// MEMORY-OPTIMIZED VERSION - lib/screens/home_screen.dart
+// This version reduces memory usage by not auto-loading mosques
 
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import '../services/api_service.dart';
 import '../models/prayer_times.dart' as prayer_model;
 import '../models/mosque.dart' as mosque_model;
-import 'settings_screen.dart';  // ADDED: Import settings screen
+import 'settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -24,8 +24,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Position? _currentPosition;
   bool _mosquesLoading = false;
   String? _mosqueError;
+  bool _mosquesLoaded = false;  // Track if mosques have been loaded
   
-  // ADDED: Settings state variables
   String _calculationMethod = 'ISNA';
   String _asrMethod = 'standard';
 
@@ -40,7 +40,9 @@ class _HomeScreenState extends State<HomeScreen> {
         debugPrint('⏰ HomeScreen: Loading timeout triggered');
         setState(() {
           _isLoading = false;
-          _errorMessage ??= 'Loading timed out. Please try again.';
+          if (_errorMessage == null) {
+            _errorMessage = 'Loading timed out. Please try again.';
+          }
         });
       }
     });
@@ -53,7 +55,6 @@ class _HomeScreenState extends State<HomeScreen> {
     await _getCurrentLocation();
   }
 
-  // ===== FIXED: Improved GPS location fetching =====
   Future<void> _getCurrentLocation() async {
     debugPrint('📍 HomeScreen: Getting current location...');
     setState(() {
@@ -95,8 +96,8 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       }
 
-      // Get current position with HIGH accuracy
-      debugPrint('🌍 HomeScreen: Fetching GPS coordinates with high accuracy...');
+      // Get current position
+      debugPrint('🌍 HomeScreen: Fetching GPS coordinates...');
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
         forceAndroidLocationManager: false,
@@ -115,9 +116,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
       debugPrint('✅ HomeScreen: Location obtained - Lat: ${position.latitude}, Lng: ${position.longitude}');
       
-      // ADDED: Validate we didn't get default NYC coordinates
+      // Validate we didn't get default NYC coordinates
       if (position.latitude == 40.7128 && position.longitude == -74.0060) {
-        debugPrint('⚠️ WARNING: Got default NYC coordinates, trying again with BEST accuracy...');
+        debugPrint('⚠️ WARNING: Got default NYC coordinates, trying again...');
         
         final position2 = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.best,
@@ -132,21 +133,13 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
 
-      // Load prayer times (REQUIRED)
+      // Load prayer times ONLY (no mosques on startup to save memory)
       debugPrint('📿 HomeScreen: Loading prayer times...');
       await _loadPrayerTimes();
       debugPrint('✅ HomeScreen: Prayer times loaded successfully');
       
-      // Load mosques in background (OPTIONAL)
-      debugPrint('🕌 HomeScreen: Loading nearby mosques in background...');
-      _loadNearbyMosques().catchError((e) {
-        debugPrint('⚠️ HomeScreen: Mosque loading failed (non-critical): $e');
-        if (mounted) {
-          setState(() {
-            _mosqueError = 'Could not load nearby mosques';
-          });
-        }
-      });
+      // ✅ MEMORY OPTIMIZATION: Don't auto-load mosques
+      // User can load them manually with the button
       
     } catch (e) {
       debugPrint('❌ HomeScreen: Error in getCurrentLocation: $e');
@@ -161,7 +154,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // ===== FIXED: Prayer times loading with proper coordinates =====
   Future<void> _loadPrayerTimes() async {
     if (_currentPosition == null) {
       debugPrint('⚠️ HomeScreen: Cannot load prayer times - no position');
@@ -172,7 +164,6 @@ class _HomeScreenState extends State<HomeScreen> {
       final today = DateTime.now();
       final dateString = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
 
-      // CRITICAL: Log the coordinates being sent
       debugPrint('🔄 HomeScreen: Requesting prayer times for:');
       debugPrint('   Latitude: ${_currentPosition!.latitude}');
       debugPrint('   Longitude: ${_currentPosition!.longitude}');
@@ -183,8 +174,8 @@ class _HomeScreenState extends State<HomeScreen> {
         latitude: _currentPosition!.latitude,
         longitude: _currentPosition!.longitude,
         date: dateString,
-        method: _calculationMethod,  // FIXED: Use state variable
-        asrMethod: _asrMethod,        // FIXED: Use state variable
+        method: _calculationMethod,
+        asrMethod: _asrMethod,
       );
 
       if (response['success'] == true) {
@@ -204,6 +195,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // ✅ MEMORY OPTIMIZATION: Load mosques only when user requests
   Future<void> _loadNearbyMosques() async {
     if (_currentPosition == null) {
       debugPrint('⚠️ HomeScreen: Cannot load mosques - no position');
@@ -216,11 +208,11 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     try {
-      debugPrint('🔄 HomeScreen: Requesting nearby mosques (radius: 50km)');
+      debugPrint('🔄 HomeScreen: Requesting nearby mosques (radius: 20km)');
       final response = await _api.getNearbyMosques(
         latitude: _currentPosition!.latitude,
         longitude: _currentPosition!.longitude,
-        radius: 50.0,
+        radius: 20.0,  // ✅ Reduced from 50km to 20km for less memory usage
       ).timeout(
         const Duration(seconds: 10),
         onTimeout: () {
@@ -235,14 +227,16 @@ class _HomeScreenState extends State<HomeScreen> {
         if (mounted) {
           setState(() {
             _nearbyMosques = mosquesList
+                .take(10)  // ✅ Limit to 10 mosques max to save memory
                 .map((json) => mosque_model.Mosque.fromJson(json))
                 .toList();
             _mosquesLoading = false;
+            _mosquesLoaded = true;
           });
         }
         
         if (mosquesList.isEmpty) {
-          debugPrint('ℹ️ HomeScreen: No mosques found in 50km radius');
+          debugPrint('ℹ️ HomeScreen: No mosques found in 20km radius');
         }
       } else {
         debugPrint('❌ HomeScreen: Mosque API returned error: ${response['error']}');
@@ -260,7 +254,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // ADDED: Location display widget
   Widget _buildLocationDisplay() {
     if (_currentPosition == null) {
       return Container();
@@ -316,7 +309,6 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text('Worldwide Salah'),
         actions: [
-          // ===== FIXED: Settings icon with navigation =====
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () async {
@@ -351,7 +343,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               );
               
-              // If settings were changed, reload prayer times
               if (result != null) {
                 debugPrint('✅ Settings updated: $result');
                 setState(() {
@@ -395,10 +386,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // ADDED: Location display
                         _buildLocationDisplay(),
                         
-                        // Prayer times
                         if (_prayerTimes != null)
                           _buildPrayerTimesCard()
                         else
@@ -411,7 +400,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         
                         const SizedBox(height: 16),
                         
-                        // Mosques section
+                        // Mosques section with manual load button
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                           child: Row(
@@ -436,9 +425,24 @@ class _HomeScreenState extends State<HomeScreen> {
                         
                         const SizedBox(height: 8),
                         
+                        // Load mosques button (if not loaded yet)
+                        if (!_mosquesLoaded && !_mosquesLoading)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: ElevatedButton.icon(
+                              onPressed: _loadNearbyMosques,
+                              icon: const Icon(Icons.mosque),
+                              label: const Text('Load Nearby Mosques'),
+                              style: ElevatedButton.styleFrom(
+                                minimumSize: const Size(double.infinity, 48),
+                              ),
+                            ),
+                          ),
+                        
                         // Mosque error
                         if (_mosqueError != null)
                           Card(
+                            margin: const EdgeInsets.symmetric(horizontal: 16),
                             child: Padding(
                               padding: const EdgeInsets.all(16),
                               child: Row(
@@ -453,8 +457,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           )
                         // Empty mosque list
-                        else if (_nearbyMosques.isEmpty && !_mosquesLoading)
+                        else if (_nearbyMosques.isEmpty && _mosquesLoaded)
                           Card(
+                            margin: const EdgeInsets.symmetric(horizontal: 16),
                             child: Padding(
                               padding: const EdgeInsets.all(16),
                               child: Row(
@@ -463,7 +468,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   const SizedBox(width: 16),
                                   Expanded(
                                     child: Text(
-                                      'No mosques found within 50 km',
+                                      'No mosques found within 20 km',
                                       style: TextStyle(color: Colors.grey[600]),
                                     ),
                                   ),
@@ -472,7 +477,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           )
                         // Mosque list
-                        else
+                        else if (_nearbyMosques.isNotEmpty)
                           _buildMosquesList(),
                       ],
                     ),
