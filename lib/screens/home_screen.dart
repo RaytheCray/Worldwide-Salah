@@ -3,6 +3,7 @@ import 'package:geolocator/geolocator.dart';
 import '../services/api_service.dart';
 import '../models/prayer_times.dart' as prayer_model;
 import '../models/mosque.dart' as mosque_model;
+import 'settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -20,6 +21,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Position? _currentPosition;
   bool _mosquesLoading = false;
   String? _mosqueError;
+
+  String _calculationMethod = 'ISNA';
+  String _asrMethod = 'standard';
 
   @override
   void initState() {
@@ -55,43 +59,81 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     try {
+      // Check if location service is enabled
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        throw Exception(
+          'Location services are disabled.\n\n'
+          'Please enable location services in your device settings.'
+        );
+      }
+
       // Check location permission
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         debugPrint('⚠️ HomeScreen: Location permission denied, requesting...');
         permission = await Geolocator.requestPermission();
+        
         if (permission == LocationPermission.denied) {
-          throw Exception('Location permission denied. Please enable location access in settings.');
+          throw Exception(
+            'Location permission denied.\n\n'
+            'Please grant location permission in Settings > Apps > Worldwide Salah > Permissions'
+          );
         }
       }
 
       if (permission == LocationPermission.deniedForever) {
-        throw Exception('Location permission permanently denied. Please enable in device settings.');
+        throw Exception(
+          'Location permission permanently denied.\n\n'
+          'Please enable location permission in:\n'
+          'Settings > Apps > Worldwide Salah > Permissions'
+        );
       }
 
-      // Get current position with timeout
+      // Get current position with HIGH accuracy and longer timeout
       debugPrint('🌍 HomeScreen: Fetching GPS coordinates...');
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
+        forceAndroidLocationManager: false,  // Use Google Play Services for better accuracy
       ).timeout(
-        const Duration(seconds: 10),
+        const Duration(seconds: 15),  // Increased timeout
         onTimeout: () {
-          throw Exception('GPS timeout. Please check your location settings.');
+          throw Exception(
+            'GPS timeout after 15 seconds.\n\n'
+            'Please check:\n'
+            '• Location services are enabled\n'
+            '• You have a clear view of the sky\n'
+            '• Try again in a few moments'
+          );
         },
       );
 
       debugPrint('✅ HomeScreen: Location obtained - Lat: ${position.latitude}, Lng: ${position.longitude}');
       
-      setState(() {
-        _currentPosition = position;
-      });
+      // VALIDATE that we got a REAL location, not the default
+      if (position.latitude == 40.7128 && position.longitude == -74.0060) {
+        debugPrint('⚠️ WARNING: Got default NYC coordinates, trying again...');
+        
+        // Try one more time with best accuracy
+        final position2 = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.best,
+        ).timeout(const Duration(seconds: 15));
+        
+        setState(() {
+          _currentPosition = position2;
+        });
+      } else {
+        setState(() {
+          _currentPosition = position;
+        });
+      }
 
-      // Load prayer times (REQUIRED - blocks loading screen)
+      // Load prayer times
       debugPrint('📿 HomeScreen: Loading prayer times...');
       await _loadPrayerTimes();
       debugPrint('✅ HomeScreen: Prayer times loaded successfully');
       
-      // Load mosques (OPTIONAL - runs in background, doesn't block UI)
+      // Load mosques in background
       debugPrint('🕌 HomeScreen: Loading nearby mosques in background...');
       _loadNearbyMosques().catchError((e) {
         debugPrint('⚠️ HomeScreen: Mosque loading failed (non-critical): $e');
@@ -108,7 +150,6 @@ class _HomeScreenState extends State<HomeScreen> {
         _errorMessage = e.toString();
       });
     } finally {
-      // CRITICAL: Always stop loading, even if there's an error
       debugPrint('🏁 HomeScreen: Stopping loading screen');
       setState(() {
         _isLoading = false;
@@ -119,34 +160,34 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadPrayerTimes() async {
     if (_currentPosition == null) {
       debugPrint('⚠️ HomeScreen: Cannot load prayer times - no position');
-      return;
+      throw Exception('No location available');
     }
 
     try {
       final today = DateTime.now();
       final dateString = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
 
-      debugPrint('🔄 HomeScreen: Requesting prayer times for $dateString');
+      debugPrint('🔄 HomeScreen: Requesting prayer times');
+      debugPrint('   Method: $_calculationMethod, Asr: $_asrMethod');  // ✅ Log settings
+      
       final response = await _api.getPrayerTimes(
         latitude: _currentPosition!.latitude,
         longitude: _currentPosition!.longitude,
         date: dateString,
-        method: 'ISNA', // You can make this configurable
-        asrMethod: 'standard',
+        method: _calculationMethod,  // ✅ Use state variable
+        asrMethod: _asrMethod,        // ✅ Use state variable
       );
 
       if (response['success'] == true) {
-        debugPrint('✅ HomeScreen: Prayer times API returned success');
+        debugPrint('✅ HomeScreen: Prayer times loaded');
         setState(() {
           _prayerTimes = prayer_model.PrayerTimes.fromJson(response);
         });
       } else {
-        debugPrint('❌ HomeScreen: Prayer times API returned error: ${response['error']}');
         throw Exception(response['error'] ?? 'Failed to load prayer times');
       }
     } catch (e) {
       debugPrint('❌ HomeScreen: Error loading prayer times: $e');
-      // Re-throw so the error can be caught in _getCurrentLocation
       rethrow;
     }
   }
@@ -216,8 +257,49 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
-            onPressed: () {
-              // Navigate to settings
+            onPressed: () async {
+              // ✅ ADD THIS NAVIGATION LOGIC
+              debugPrint('⚙️ Opening settings screen...');
+              
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => SettingsScreen(
+                    location: _currentPosition != null
+                        ? 'Lat: ${_currentPosition!.latitude.toStringAsFixed(4)}, '
+                          'Lng: ${_currentPosition!.longitude.toStringAsFixed(4)}'
+                        : 'Location not available',
+                    calculationMethod: _calculationMethod,
+                    asrMethod: _asrMethod,
+                    onLocationChanged: (newLocation) {
+                      debugPrint('📍 Location changed: $newLocation');
+                      // Handle location change if needed
+                    },
+                    onCalculationMethodChanged: (newMethod) {
+                      setState(() {
+                        _calculationMethod = newMethod;
+                      });
+                      _loadPrayerTimes();  // Reload with new method
+                    },
+                    onAsrMethodChanged: (newAsrMethod) {
+                      setState(() {
+                        _asrMethod = newAsrMethod;
+                      });
+                      _loadPrayerTimes();  // Reload with new method
+                    },
+                  ),
+                ),
+              );
+              
+              // If settings were changed, reload prayer times
+              if (result != null) {
+                debugPrint('✅ Settings updated, reloading prayer times...');
+                setState(() {
+                  _calculationMethod = result['calculationMethod'] ?? _calculationMethod;
+                  _asrMethod = result['asrMethod'] ?? _asrMethod;
+                });
+                await _loadPrayerTimes();
+              }
             },
           ),
         ],
@@ -253,6 +335,55 @@ class _HomeScreenState extends State<HomeScreen> {
       floatingActionButton: FloatingActionButton(
         onPressed: _isLoading ? null : _getCurrentLocation,
         child: const Icon(Icons.refresh),
+      ),
+    );
+  }
+
+  Widget _buildLocationDisplay() {
+    if (_currentPosition == null) {
+      return Container();
+    }
+    
+    return Container(
+      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.blue.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.blue.shade200),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.location_on, color: Colors.blue.shade700),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Current Location',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                Text(
+                  'Lat: ${_currentPosition!.latitude.toStringAsFixed(4)}, '
+                  'Lng: ${_currentPosition!.longitude.toStringAsFixed(4)}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: Icon(Icons.refresh, color: Colors.blue.shade700),
+            onPressed: _getCurrentLocation,
+            tooltip: 'Refresh location',
+          ),
+        ],
       ),
     );
   }

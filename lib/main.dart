@@ -23,6 +23,10 @@ Future<void> requestNotificationPermission() async {
 }
 
 Future<void> main() async {
+  debugPrint = (String? message, {int? wrapWidth}) {
+    debugPrint('🔍 DEBUG: $message');
+  };
+
   WidgetsFlutterBinding.ensureInitialized();
 
   // Request notification permission as early as possible so plugins that post
