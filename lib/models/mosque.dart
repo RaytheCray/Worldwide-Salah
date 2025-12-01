@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 class Mosque {
   final int mosqueId;
   final String name;
@@ -33,7 +35,7 @@ class Mosque {
         try {
           return double.parse(value);
         } catch (e) {
-          print('⚠️ Mosque: Could not parse distance "$value": $e');
+          debugPrint('⚠️ Mosque: Could not parse distance "$value": $e');
           return null;
         }
       }

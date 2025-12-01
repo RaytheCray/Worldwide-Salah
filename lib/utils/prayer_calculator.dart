@@ -172,7 +172,7 @@ class PrayerCalculator {
     try {
       debugPrint('🌐 Fetching monthly prayers for $year-$month...');
       
-      final response = await _apiService.getMonthlyPrayers(
+      final response = await _apiService.getMonthlyPrayerTimes(
         latitude: latitude,
         longitude: longitude,
         year: year,
