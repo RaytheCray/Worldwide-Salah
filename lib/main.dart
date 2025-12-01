@@ -1,51 +1,75 @@
 import 'package:flutter/material.dart';
 import 'screens/home_screen.dart';
-import 'theme/app_theme.dart';
-import 'package:permission_handler/permission_handler.dart';
+import 'screens/monthly_tab.dart';
+import 'screens/today_tab.dart';
 
-Future<void> requestNotificationPermission() async {
-  try {
-    // permission_handler maps Permission.notification to the correct Android/iOS permission
-    final status = await Permission.notification.status;
-    if (status.isGranted) return; // already granted
-
-    final result = await Permission.notification.request();
-    if (result.isGranted) {
-      debugPrint('Notification permission granted');
-    } else {
-      debugPrint('Notification permission denied: $result');
-      // Optionally you can show UI explaining why the permission is useful
-    }
-  } catch (e) {
-    // Defensive: if permission_handler isn't available or throws, don't crash the app
-    debugPrint('Error requesting notification permission: $e');
-  }
+void main() {
+  // ✅ REMOVED the problematic debugPrint override
+  // Just run the app normally
+  runApp(const MyApp());
 }
 
-Future<void> main() async {
-  debugPrint = (String? message, {int? wrapWidth}) {
-    debugPrint('🔍 DEBUG: $message');
-  };
-
-  WidgetsFlutterBinding.ensureInitialized();
-
-  // Request notification permission as early as possible so plugins that post
-  // notifications won't crash if they run during initialization.
-  await requestNotificationPermission();
-
-  runApp(const WorldwideSalahApp());
-}
-
-class WorldwideSalahApp extends StatelessWidget {
-  const WorldwideSalahApp({super.key});
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Worldwide Salah',
-      theme: AppTheme.lightTheme, // Using centralized theme
-      home: const HomeScreen(),
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+        useMaterial3: true,
+      ),
+      home: const MainScreen(),
       debugShowCheckedModeBanner: false,
     );
   }
-} 
+}
+
+class MainScreen extends StatefulWidget {
+  const MainScreen({super.key});
+
+  @override
+  State<MainScreen> createState() => _MainScreenState();
+}
+
+class _MainScreenState extends State<MainScreen> {
+  int _selectedIndex = 0;
+
+  static const List<Widget> _pages = [
+    HomeScreen(),
+    TodayTab(),
+    MonthlyTab(),
+  ];
+
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: _pages[_selectedIndex],
+      bottomNavigationBar: BottomNavigationBar(
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: 'Home',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.today),
+            label: 'Today',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.calendar_month),
+            label: 'Monthly',
+          ),
+        ],
+        currentIndex: _selectedIndex,
+        onTap: _onItemTapped,
+      ),
+    );
+  }
+}
