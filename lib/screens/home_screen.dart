@@ -40,9 +40,7 @@ class _HomeScreenState extends State<HomeScreen> {
         debugPrint('⏰ HomeScreen: Loading timeout triggered');
         setState(() {
           _isLoading = false;
-          if (_errorMessage == null) {
-            _errorMessage = 'Loading timed out. Please try again.';
-          }
+          _errorMessage ??= 'Loading timed out. Please try again.';
         });
       }
     });
