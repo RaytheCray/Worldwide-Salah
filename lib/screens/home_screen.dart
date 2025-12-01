@@ -1,9 +1,12 @@
+// FIXED VERSION - lib/screens/home_screen.dart
+// Replace your existing home_screen.dart with this file
+
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import '../services/api_service.dart';
 import '../models/prayer_times.dart' as prayer_model;
 import '../models/mosque.dart' as mosque_model;
-import 'settings_screen.dart';
+import 'settings_screen.dart';  // ADDED: Import settings screen
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -21,7 +24,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Position? _currentPosition;
   bool _mosquesLoading = false;
   String? _mosqueError;
-
+  
+  // ADDED: Settings state variables
   String _calculationMethod = 'ISNA';
   String _asrMethod = 'standard';
 
@@ -30,10 +34,10 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     debugPrint('🔄 HomeScreen: initState called');
     
-    // Add a safety timeout to prevent infinite loading
-    Future.delayed(const Duration(seconds: 15), () {
+    // Safety timeout
+    Future.delayed(const Duration(seconds: 20), () {
       if (_isLoading && mounted) {
-        debugPrint('⏰ HomeScreen: Loading timeout triggered, forcing stop');
+        debugPrint('⏰ HomeScreen: Loading timeout triggered');
         setState(() {
           _isLoading = false;
           _errorMessage ??= 'Loading timed out. Please try again.';
@@ -46,10 +50,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _initializeApp() async {
     debugPrint('📱 HomeScreen: Initializing app...');
-    // Get location and load data
     await _getCurrentLocation();
   }
 
+  // ===== FIXED: Improved GPS location fetching =====
   Future<void> _getCurrentLocation() async {
     debugPrint('📍 HomeScreen: Getting current location...');
     setState(() {
@@ -77,7 +81,8 @@ class _HomeScreenState extends State<HomeScreen> {
         if (permission == LocationPermission.denied) {
           throw Exception(
             'Location permission denied.\n\n'
-            'Please grant location permission in Settings > Apps > Worldwide Salah > Permissions'
+            'Please grant location permission in:\n'
+            'Settings > Apps > Worldwide Salah > Permissions'
           );
         }
       }
@@ -85,18 +90,18 @@ class _HomeScreenState extends State<HomeScreen> {
       if (permission == LocationPermission.deniedForever) {
         throw Exception(
           'Location permission permanently denied.\n\n'
-          'Please enable location permission in:\n'
+          'Please enable location in:\n'
           'Settings > Apps > Worldwide Salah > Permissions'
         );
       }
 
-      // Get current position with HIGH accuracy and longer timeout
-      debugPrint('🌍 HomeScreen: Fetching GPS coordinates...');
+      // Get current position with HIGH accuracy
+      debugPrint('🌍 HomeScreen: Fetching GPS coordinates with high accuracy...');
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
-        forceAndroidLocationManager: false,  // Use Google Play Services for better accuracy
+        forceAndroidLocationManager: false,
       ).timeout(
-        const Duration(seconds: 15),  // Increased timeout
+        const Duration(seconds: 15),
         onTimeout: () {
           throw Exception(
             'GPS timeout after 15 seconds.\n\n'
@@ -110,11 +115,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
       debugPrint('✅ HomeScreen: Location obtained - Lat: ${position.latitude}, Lng: ${position.longitude}');
       
-      // VALIDATE that we got a REAL location, not the default
+      // ADDED: Validate we didn't get default NYC coordinates
       if (position.latitude == 40.7128 && position.longitude == -74.0060) {
-        debugPrint('⚠️ WARNING: Got default NYC coordinates, trying again...');
+        debugPrint('⚠️ WARNING: Got default NYC coordinates, trying again with BEST accuracy...');
         
-        // Try one more time with best accuracy
         final position2 = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.best,
         ).timeout(const Duration(seconds: 15));
@@ -128,12 +132,12 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
 
-      // Load prayer times
+      // Load prayer times (REQUIRED)
       debugPrint('📿 HomeScreen: Loading prayer times...');
       await _loadPrayerTimes();
       debugPrint('✅ HomeScreen: Prayer times loaded successfully');
       
-      // Load mosques in background
+      // Load mosques in background (OPTIONAL)
       debugPrint('🕌 HomeScreen: Loading nearby mosques in background...');
       _loadNearbyMosques().catchError((e) {
         debugPrint('⚠️ HomeScreen: Mosque loading failed (non-critical): $e');
@@ -157,6 +161,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // ===== FIXED: Prayer times loading with proper coordinates =====
   Future<void> _loadPrayerTimes() async {
     if (_currentPosition == null) {
       debugPrint('⚠️ HomeScreen: Cannot load prayer times - no position');
@@ -167,23 +172,30 @@ class _HomeScreenState extends State<HomeScreen> {
       final today = DateTime.now();
       final dateString = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
 
-      debugPrint('🔄 HomeScreen: Requesting prayer times');
-      debugPrint('   Method: $_calculationMethod, Asr: $_asrMethod');  // ✅ Log settings
+      // CRITICAL: Log the coordinates being sent
+      debugPrint('🔄 HomeScreen: Requesting prayer times for:');
+      debugPrint('   Latitude: ${_currentPosition!.latitude}');
+      debugPrint('   Longitude: ${_currentPosition!.longitude}');
+      debugPrint('   Date: $dateString');
+      debugPrint('   Method: $_calculationMethod, Asr: $_asrMethod');
       
       final response = await _api.getPrayerTimes(
         latitude: _currentPosition!.latitude,
         longitude: _currentPosition!.longitude,
         date: dateString,
-        method: _calculationMethod,  // ✅ Use state variable
-        asrMethod: _asrMethod,        // ✅ Use state variable
+        method: _calculationMethod,  // FIXED: Use state variable
+        asrMethod: _asrMethod,        // FIXED: Use state variable
       );
 
       if (response['success'] == true) {
-        debugPrint('✅ HomeScreen: Prayer times loaded');
+        debugPrint('✅ HomeScreen: Prayer times API returned success');
+        debugPrint('   Times: ${response['times']}');
+        
         setState(() {
           _prayerTimes = prayer_model.PrayerTimes.fromJson(response);
         });
       } else {
+        debugPrint('❌ HomeScreen: Prayer times API returned error: ${response['error']}');
         throw Exception(response['error'] ?? 'Failed to load prayer times');
       }
     } catch (e) {
@@ -208,7 +220,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final response = await _api.getNearbyMosques(
         latitude: _currentPosition!.latitude,
         longitude: _currentPosition!.longitude,
-        radius: 50.0, // ✅ INCREASED from 10km to 50km for better coverage
+        radius: 50.0,
       ).timeout(
         const Duration(seconds: 10),
         onTimeout: () {
@@ -218,7 +230,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (response['success'] == true) {
         final mosquesList = response['mosques'] as List;
-        debugPrint('✅ HomeScreen: Found ${mosquesList.length} mosques nearby');
+        debugPrint('✅ HomeScreen: Found ${mosquesList.length} unique mosques');
         
         if (mounted) {
           setState(() {
@@ -245,100 +257,10 @@ class _HomeScreenState extends State<HomeScreen> {
           _mosqueError = 'Unable to load nearby mosques';
         });
       }
-      // Don't rethrow - mosque loading is optional
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Worldwide Salah'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () async {
-              // ✅ ADD THIS NAVIGATION LOGIC
-              debugPrint('⚙️ Opening settings screen...');
-              
-              final result = await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => SettingsScreen(
-                    location: _currentPosition != null
-                        ? 'Lat: ${_currentPosition!.latitude.toStringAsFixed(4)}, '
-                          'Lng: ${_currentPosition!.longitude.toStringAsFixed(4)}'
-                        : 'Location not available',
-                    calculationMethod: _calculationMethod,
-                    asrMethod: _asrMethod,
-                    onLocationChanged: (newLocation) {
-                      debugPrint('📍 Location changed: $newLocation');
-                      // Handle location change if needed
-                    },
-                    onCalculationMethodChanged: (newMethod) {
-                      setState(() {
-                        _calculationMethod = newMethod;
-                      });
-                      _loadPrayerTimes();  // Reload with new method
-                    },
-                    onAsrMethodChanged: (newAsrMethod) {
-                      setState(() {
-                        _asrMethod = newAsrMethod;
-                      });
-                      _loadPrayerTimes();  // Reload with new method
-                    },
-                  ),
-                ),
-              );
-              
-              // If settings were changed, reload prayer times
-              if (result != null) {
-                debugPrint('✅ Settings updated, reloading prayer times...');
-                setState(() {
-                  _calculationMethod = result['calculationMethod'] ?? _calculationMethod;
-                  _asrMethod = result['asrMethod'] ?? _asrMethod;
-                });
-                await _loadPrayerTimes();
-              }
-            },
-          ),
-        ],
-      ),
-      body: _isLoading
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const CircularProgressIndicator(),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Loading...',
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 14,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'This may take a few seconds',
-                    style: TextStyle(
-                      color: Colors.grey[400],
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-            )
-          : _errorMessage != null
-              ? _buildErrorWidget()
-              : _buildContent(),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _isLoading ? null : _getCurrentLocation,
-        child: const Icon(Icons.refresh),
-      ),
-    );
-  }
-
+  // ADDED: Location display widget
   Widget _buildLocationDisplay() {
     if (_currentPosition == null) {
       return Container();
@@ -388,146 +310,193 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildErrorWidget() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline, size: 64, color: Colors.red),
-            const SizedBox(height: 16),
-            Text(
-              _errorMessage ?? 'An error occurred',
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 16),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: _getCurrentLocation,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Retry'),
-            ),
-          ],
-        ),
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Worldwide Salah'),
+        actions: [
+          // ===== FIXED: Settings icon with navigation =====
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () async {
+              debugPrint('⚙️ Opening settings screen...');
+              
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => SettingsScreen(
+                    location: _currentPosition != null
+                        ? 'Lat: ${_currentPosition!.latitude.toStringAsFixed(4)}, '
+                          'Lng: ${_currentPosition!.longitude.toStringAsFixed(4)}'
+                        : 'Location not available',
+                    calculationMethod: _calculationMethod,
+                    asrMethod: _asrMethod,
+                    onLocationChanged: (newLocation) {
+                      debugPrint('📍 Location changed: $newLocation');
+                    },
+                    onCalculationMethodChanged: (newMethod) {
+                      setState(() {
+                        _calculationMethod = newMethod;
+                      });
+                      _loadPrayerTimes();
+                    },
+                    onAsrMethodChanged: (newAsrMethod) {
+                      setState(() {
+                        _asrMethod = newAsrMethod;
+                      });
+                      _loadPrayerTimes();
+                    },
+                  ),
+                ),
+              );
+              
+              // If settings were changed, reload prayer times
+              if (result != null) {
+                debugPrint('✅ Settings updated: $result');
+                setState(() {
+                  _calculationMethod = result['calculationMethod'] ?? _calculationMethod;
+                  _asrMethod = result['asrMethod'] ?? _asrMethod;
+                });
+                await _loadPrayerTimes();
+              }
+            },
+          ),
+        ],
       ),
-    );
-  }
-
-  Widget _buildContent() {
-    return RefreshIndicator(
-      onRefresh: _getCurrentLocation,
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Location info
-            if (_currentPosition != null) ...[
-              Card(
-                child: ListTile(
-                  leading: const Icon(Icons.location_on),
-                  title: const Text('Current Location'),
-                  subtitle: Text(
-                    'Lat: ${_currentPosition!.latitude.toStringAsFixed(4)}, '
-                    'Lng: ${_currentPosition!.longitude.toStringAsFixed(4)}',
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-
-            // Prayer times
-            if (_prayerTimes != null) ...[
-              Text(
-                'Prayer Times',
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
-              const SizedBox(height: 8),
-              _buildPrayerTimesCard(),
-              const SizedBox(height: 24),
-            ],
-
-            // Nearby mosques section
-            Text(
-              'Nearby Mosques',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            const SizedBox(height: 8),
-            
-            // Mosque loading state
-            if (_mosquesLoading)
-              const Card(
-                child: Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: Row(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _errorMessage != null
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                      SizedBox(width: 16),
-                      Text('Loading nearby mosques...'),
-                    ],
-                  ),
-                ),
-              )
-            // Mosque error state
-            else if (_mosqueError != null)
-              Card(
-                color: Colors.orange[50],
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.warning, color: Colors.orange),
-                      const SizedBox(width: 16),
-                      Expanded(
+                      const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                      const SizedBox(height: 16),
+                      Padding(
+                        padding: const EdgeInsets.all(16),
                         child: Text(
-                          _mosqueError!,
-                          style: const TextStyle(color: Colors.orange),
+                          _errorMessage!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 16),
                         ),
                       ),
-                    ],
-                  ),
-                ),
-              )
-            // Empty mosque list
-            else if (_nearbyMosques.isEmpty)
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Row(
-                    children: [
-                      Icon(Icons.info_outline, color: Colors.grey[600]),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Text(
-                          'No mosques found within 50 km',
-                          style: TextStyle(color: Colors.grey[600]),
-                        ),
+                      ElevatedButton(
+                        onPressed: _getCurrentLocation,
+                        child: const Text('Try Again'),
                       ),
                     ],
                   ),
+                )
+              : RefreshIndicator(
+                  onRefresh: _getCurrentLocation,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // ADDED: Location display
+                        _buildLocationDisplay(),
+                        
+                        // Prayer times
+                        if (_prayerTimes != null)
+                          _buildPrayerTimesCard()
+                        else
+                          const Card(
+                            child: Padding(
+                              padding: EdgeInsets.all(16),
+                              child: Text('Loading prayer times...'),
+                            ),
+                          ),
+                        
+                        const SizedBox(height: 16),
+                        
+                        // Mosques section
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'Nearby Mosques',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              if (_mosquesLoading)
+                                const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                            ],
+                          ),
+                        ),
+                        
+                        const SizedBox(height: 8),
+                        
+                        // Mosque error
+                        if (_mosqueError != null)
+                          Card(
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.warning, color: Colors.orange[700]),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Text(_mosqueError!),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        // Empty mosque list
+                        else if (_nearbyMosques.isEmpty && !_mosquesLoading)
+                          Card(
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.info_outline, color: Colors.grey[600]),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Text(
+                                      'No mosques found within 50 km',
+                                      style: TextStyle(color: Colors.grey[600]),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        // Mosque list
+                        else
+                          _buildMosquesList(),
+                      ],
+                    ),
+                  ),
                 ),
-              )
-            // Mosque list
-            else
-              _buildMosquesList(),
-          ],
-        ),
-      ),
     );
   }
 
   Widget _buildPrayerTimesCard() {
     return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const Text(
+              'Prayer Times',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const Divider(),
             _buildPrayerTimeRow('Fajr', _prayerTimes!.fajr),
             _buildPrayerTimeRow('Sunrise', _prayerTimes!.sunrise),
             _buildPrayerTimeRow('Dhuhr', _prayerTimes!.dhuhr),
@@ -585,6 +554,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Column(
       children: _nearbyMosques.map((mosque) {
         return Card(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           child: ListTile(
             leading: const Icon(Icons.mosque),
             title: Text(mosque.name),
@@ -604,7 +574,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             trailing: const Icon(Icons.arrow_forward_ios, size: 16),
             onTap: () {
-              // Navigate to mosque details
               _showMosqueDetails(mosque);
             },
           ),
@@ -628,35 +597,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
               const SizedBox(height: 8),
-              if (mosque.address case final address?) ...[
-                Row(
-                  children: [
-                    const Icon(Icons.location_on, size: 16),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text(address)),
-                  ],
-                ),
-                const SizedBox(height: 8),
-              ],
-              if (mosque.phone case final phone?) ...[
-                Row(
-                  children: [
-                    const Icon(Icons.phone, size: 16),
-                    const SizedBox(width: 8),
-                    Text(phone),
-                  ],
-                ),
-                const SizedBox(height: 8),
-              ],
-              if (mosque.website case final website?) ...[
-                Row(
-                  children: [
-                    const Icon(Icons.web, size: 16),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text(website)),
-                  ],
-                ),
-              ],
+              if (mosque.address case final address?)
+                Text(address),
+              if (mosque.phone case final phone?)
+                Text('Phone: $phone'),
+              if (mosque.distance case final distance?)
+                Text('Distance: ${distance.toStringAsFixed(1)} km'),
             ],
           ),
         );

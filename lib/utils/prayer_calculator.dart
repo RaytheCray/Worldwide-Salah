@@ -1,3 +1,6 @@
+// FIXED VERSION - lib/utils/prayer_calculator.dart
+// This version removes hardcoded NYC coordinates and fixes compilation errors
+
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 
@@ -29,10 +32,11 @@ class PrayerCalculator {
   static double? _cachedLon;
 
   /// Calculate prayer times using the backend API
+  /// FIXED: Removed hardcoded NYC coordinates - now requires location parameters
   static Future<List<PrayerTime>> calculatePrayerTimes(
     DateTime date, {
-    double latitude = 40.7128,  // Default: New York
-    double longitude = -74.0060,
+    required double latitude,   // CHANGED: Now required, no default
+    required double longitude,  // CHANGED: Now required, no default
     String method = 'ISNA',
     String asrMethod = 'standard',
   }) async {
@@ -49,6 +53,7 @@ class PrayerCalculator {
 
     try {
       debugPrint('🌐 Fetching prayer times from backend for $dateString...');
+      debugPrint('   Location: $latitude, $longitude');
       
       final response = await _apiService.getPrayerTimes(
         latitude: latitude,
@@ -91,9 +96,10 @@ class PrayerCalculator {
   }
 
   /// Get next upcoming prayer
+  /// FIXED: Removed hardcoded NYC coordinates - now requires location parameters
   static Future<PrayerTime> getNextPrayer({
-    double latitude = 40.7128,
-    double longitude = -74.0060,
+    required double latitude,   // CHANGED: Now required, no default
+    required double longitude,  // CHANGED: Now required, no default
     String method = 'ISNA',
     String asrMethod = 'standard',
   }) async {
@@ -126,9 +132,10 @@ class PrayerCalculator {
   }
 
   /// Get time remaining until next prayer
+  /// FIXED: Removed hardcoded NYC coordinates - now requires location parameters
   static Future<String> getTimeUntilNextPrayer({
-    double latitude = 40.7128,
-    double longitude = -74.0060,
+    required double latitude,   // CHANGED: Now required, no default
+    required double longitude,  // CHANGED: Now required, no default
     String method = 'ISNA',
     String asrMethod = 'standard',
   }) async {
@@ -161,11 +168,12 @@ class PrayerCalculator {
   }
 
   /// Get monthly prayer times from backend
+  /// FIXED: Removed hardcoded NYC coordinates - now requires location parameters
   static Future<List<Map<String, dynamic>>> getMonthlyPrayerTimes({
     required int year,
     required int month,
-    double latitude = 40.7128,
-    double longitude = -74.0060,
+    required double latitude,   // CHANGED: Now required, no default
+    required double longitude,  // CHANGED: Now required, no default
     String method = 'ISNA',
     String asrMethod = 'standard',
   }) async {
@@ -209,10 +217,11 @@ class PrayerCalculator {
   }
 
   /// Get Ramadan schedule from backend
+  /// FIXED: Removed hardcoded NYC coordinates - now requires location parameters
   static Future<Map<String, dynamic>> getRamadanSchedule({
     required int year,
-    double latitude = 40.7128,
-    double longitude = -74.0060,
+    required double latitude,   // CHANGED: Now required, no default
+    required double longitude,  // CHANGED: Now required, no default
     String method = 'ISNA',
   }) async {
     try {

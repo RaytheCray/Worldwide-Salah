@@ -1,4 +1,8 @@
+// FIXED VERSION - lib/screens/monthly_tab.dart
+// This file now properly passes location parameters to PrayerCalculator
+
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import '../utils/prayer_calculator.dart';
 
 class MonthlyTab extends StatefulWidget {
@@ -9,269 +13,216 @@ class MonthlyTab extends StatefulWidget {
 }
 
 class _MonthlyTabState extends State<MonthlyTab> {
-  int _selectedMonth = DateTime.now().month - 1;
+  List<Map<String, dynamic>>? _monthlyPrayerTimes;
+  bool _isLoading = false;
+  String? _errorMessage;
+  Position? _currentPosition;
+  DateTime _selectedDate = DateTime.now();
 
-  List<Map<String, dynamic>> _generateMonthlyData() {
-    const year = 2025;
-    final daysInMonth = DateTime(year, _selectedMonth + 2, 0).day;
-    return List.generate(daysInMonth, (index) {
-      final day = index + 1;
-      final date = DateTime(year, _selectedMonth + 1, day);
-      return {
-        'day': day,
-        'prayers': PrayerCalculator.calculatePrayerTimes(date),
-      };
+  @override
+  void initState() {
+    super.initState();
+    _initializeData();
+  }
+
+  Future<void> _initializeData() async {
+    await _getCurrentLocation();
+    if (_currentPosition != null) {
+      await _loadMonthlyData();
+    }
+  }
+
+  Future<void> _getCurrentLocation() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
     });
+
+    try {
+      // Check if location service is enabled
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        throw Exception('Location services are disabled');
+      }
+
+      // Check location permission
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          throw Exception('Location permission denied');
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        throw Exception('Location permission permanently denied');
+      }
+
+      // Get current position
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception('Location timeout');
+        },
+      );
+
+      setState(() {
+        _currentPosition = position;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _loadMonthlyData() async {
+    if (_currentPosition == null) return;
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      // ✅ FIXED: Now passing required latitude and longitude
+      final monthlyData = await PrayerCalculator.getMonthlyPrayerTimes(
+        year: _selectedDate.year,
+        month: _selectedDate.month,
+        latitude: _currentPosition!.latitude,   // ✅ ADDED
+        longitude: _currentPosition!.longitude, // ✅ ADDED
+        method: 'ISNA',
+        asrMethod: 'standard',
+      );
+
+      setState(() {
+        _monthlyPrayerTimes = monthlyData;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _changeMonth(int delta) async {
+    setState(() {
+      _selectedDate = DateTime(
+        _selectedDate.year,
+        _selectedDate.month + delta,
+        1,
+      );
+    });
+    await _loadMonthlyData();
   }
 
   @override
   Widget build(BuildContext context) {
-    final months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
-    ];
-
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Monthly Timetable'),
-        backgroundColor: Colors.blue.shade600,
-        elevation: 0,
-      ),
-      body: Column(
-        children: [
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Select Month',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<int>(
-                      value: _selectedMonth,
-                      isExpanded: true,
-                      items: months
-                          .asMap()
-                          .entries
-                          .map((entry) => DropdownMenuItem(
-                                value: entry.key,
-                                child: Text(
-                                  '${entry.value} 2025',
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ))
-                          .toList(),
-                      onChanged: (value) {
-                        setState(() => _selectedMonth = value!);
-                      },
-                    ),
-                  ),
-                ),
-              ],
-            ),
+        title: Text(
+          '${_getMonthName(_selectedDate.month)} ${_selectedDate.year}',
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.chevron_left),
+            onPressed: () => _changeMonth(-1),
           ),
-          Expanded(
-            child: SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.1),
-                        blurRadius: 10,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Colors.blue.shade500,
-                              Colors.blue.shade700
-                            ],
-                          ),
-                          borderRadius: const BorderRadius.only(
-                            topLeft: Radius.circular(16),
-                            topRight: Radius.circular(16),
-                          ),
-                        ),
-                        child: Text(
-                          '${months[_selectedMonth]} Prayer Times',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: FutureBuilder<List<Map<String, dynamic>>>(
-                          future: _generateMonthlyDataAsync(),
-                          builder: (context, snapshot) {
-                            if (snapshot.connectionState == ConnectionState.waiting) {
-                              return const Padding(
-                                padding: EdgeInsets.all(32.0),
-                                child: CircularProgressIndicator(),
-                              );
-                            }
-                            
-                            if (snapshot.hasError) {
-                              return Padding(
-                                padding: const EdgeInsets.all(16.0),
-                                child: Text('Error: ${snapshot.error}'),
-                              );
-                            }
-                            
-                            final data = snapshot.data ?? [];
-                            
-                            return DataTable(
-                              headingRowColor: WidgetStateProperty.all(
-                                Colors.grey.shade100,
-                              ),
-                              columnSpacing: 12,
-                              horizontalMargin: 12,
-                              columns: const [
-                                DataColumn(
-                                  label: Text(
-                                    'Date',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ),
-                                DataColumn(
-                                  label: Text(
-                                    'Fajr',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ),
-                                DataColumn(
-                                  label: Text(
-                                    'Sunrise',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ),
-                                DataColumn(
-                                  label: Text(
-                                    'Dhuhr',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ),
-                                DataColumn(
-                                  label: Text(
-                                    'Asr',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ),
-                                DataColumn(
-                                  label: Text(
-                                    'Maghrib',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ),
-                                DataColumn(
-                                  label: Text(
-                                    'Isha',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                              rows: data.map((day) {
-                                final prayers = day['prayers'] as List<PrayerTime>;
-                                return DataRow(
-                                  cells: [
-                                    DataCell(Text(
-                                      '${day['day']}',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    )),
-                                    ...prayers.map((prayer) => DataCell(
-                                          Text(
-                                            prayer.formattedTime,
-                                            style: const TextStyle(
-                                              fontFamily: 'monospace',
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                        )),
-                                  ],
-                                );
-                              }).toList(),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
+          IconButton(
+            icon: const Icon(Icons.chevron_right),
+            onPressed: () => _changeMonth(1),
           ),
         ],
+      ),
+      body: _buildBody(),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_errorMessage != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 64, color: Colors.red),
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                _errorMessage!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 16),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: _initializeData,
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_monthlyPrayerTimes == null || _monthlyPrayerTimes!.isEmpty) {
+      return const Center(
+        child: Text('No prayer times available'),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadMonthlyData,
+      child: ListView.builder(
+        itemCount: _monthlyPrayerTimes!.length,
+        itemBuilder: (context, index) {
+          final day = _monthlyPrayerTimes![index];
+          final prayers = day['prayers'] as List<PrayerTime>;
+          final date = day['date'] as String;
+          final dayNum = day['day'] as int;
+
+          return Card(
+            margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: ExpansionTile(
+              title: Text(
+                'Day $dayNum - $date',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              children: prayers.map((prayer) {
+                if (prayer.name == 'Sunrise') {
+                  return const SizedBox.shrink();
+                }
+                return ListTile(
+                  dense: true,
+                  title: Text(prayer.name),
+                  trailing: Text(
+                    prayer.formattedTime,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          );
+        },
       ),
     );
   }
 
-  Future<List<Map<String, dynamic>>> _generateMonthlyDataAsync() async {
-    const year = 2025;
-    final daysInMonth = DateTime(year, _selectedMonth + 2, 0).day;
-    final List<Map<String, dynamic>> result = [];
-    
-    for (int index = 0; index < daysInMonth; index++) {
-      final day = index + 1;
-      final date = DateTime(year, _selectedMonth + 1, day);
-      final prayers = await PrayerCalculator.calculatePrayerTimes(date);
-      result.add({
-        'day': day,
-        'prayers': prayers,
-      });
-    }
-    
-    return result;
+  String _getMonthName(int month) {
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    return months[month - 1];
   }
 }
